@@ -1,0 +1,99 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import mindspore as ms
+from mindspore import context
+import troubleshooter as ts
+import mindspore.nn as nn_ms
+
+device=torch.device('cuda')
+
+# ---------------------------- 1. PyTorch LeNet5Fashion ----------------------------
+class TorchLeNet5Fashion(nn.Module):
+    def __init__(self, num_classes=10):
+        super(TorchLeNet5Fashion, self).__init__()
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding=1).to(device)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2).to(device)
+        self.dropout1 = nn.Dropout(p=0.5).to(device)
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=3, padding=1).to(device)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2).to(device)
+        self.dropout2 = nn.Dropout(p=0.5).to(device)
+        self.flatten = nn.Flatten().to(device)
+        self.fc1 = nn.Linear(32 * 7 * 7, 120).to(device)
+        self.fc2 = nn.Linear(120, 84).to(device)
+        self.fc3 = nn.Linear(84, num_classes).to(device)
+        self.relu = nn.ReLU().to(device)
+
+        # 初始化权重
+        self._initialize_weights()
+
+    def forward(self, x):
+        x=x.to(device)
+        x = self.relu(self.conv1(x))
+        x = self.pool1(x)
+        x = self.dropout1(x)
+        x = self.relu(self.conv2(x))
+        x = self.pool2(x)
+        x = self.dropout2(x)
+        x = self.flatten(x)
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
+
+# ---------------------------- 2. MindSpore LeNet5Fashion ----------------------------
+class MindSporeLeNet5Fashion(nn_ms.Cell):
+    def __init__(self, num_classes=10):
+        super(MindSporeLeNet5Fashion, self).__init__()
+        self.conv1 = nn_ms.Conv2d(1, 64, kernel_size=3, padding=1, pad_mode='pad')
+        self.pool1 = nn_ms.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout1 = nn_ms.Dropout(keep_prob=0.5)
+        self.conv2 = nn_ms.Conv2d(64, 32, kernel_size=3, padding=1, pad_mode='pad')
+        self.pool2 = nn_ms.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout2 = nn_ms.Dropout(keep_prob=0.5)
+        self.flatten = nn_ms.Flatten()
+        self.fc1 = nn_ms.Dense(32 * 7 * 7, 120)
+        self.fc2 = nn_ms.Dense(120, 84)
+        self.fc3 = nn_ms.Dense(84, num_classes)
+        self.relu = nn_ms.ReLU()
+
+        # 初始化权重（与PyTorch一致）
+        self._initialize_weights()
+
+    def construct(self, x):
+        x = self.relu(self.conv1(x))
+        x = self.pool1(x)
+        x = self.dropout1(x)
+        x = self.relu(self.conv2(x))
+        x = self.pool2(x)
+        x = self.dropout2(x)
+        x = self.flatten(x)
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+    def _initialize_weights(self):
+        for _, cell in self.cells_and_names():
+            if isinstance(cell, nn_ms.Conv2d):
+                cell.weight.set_data(ms.common.initializer.initializer(
+                    'HeNormal', cell.weight.shape, cell.weight.dtype))
+                if cell.bias is not None:
+                    cell.bias.set_data(ms.common.initializer.initializer(
+                        'zeros', cell.bias.shape, cell.bias.dtype))
+            elif isinstance(cell, nn_ms.Dense):
+                cell.weight.set_data(ms.common.initializer.initializer(
+                    'Normal', cell.weight.shape, cell.weight.dtype))
+                if cell.bias is not None:
+                    cell.bias.set_data(ms.common.initializer.initializer(
+                        'zeros', cell.bias.shape, cell.bias.dtype))
