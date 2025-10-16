@@ -7,32 +7,30 @@ import troubleshooter as ts
 import mindspore.nn as nn_ms
 import mindspore.ops as ops
 
-device=torch.device('cuda')
-
-# ---------------------------- 1. PyTorch InceptionBlock ----------------------------
+# ---------------------------- del. PyTorch InceptionBlock ----------------------------
 class TorchInceptionBlock(nn.Module):
     def __init__(self, in_channels, c1=16, c2=(32,64), c3=(16,32), c4=16):
         super(TorchInceptionBlock, self).__init__()
-        # Path 1
-        self.p1_1 = nn.Conv2d(in_channels, c1, kernel_size=1, bias=True).to(device)
+        # Path del
+        self.p1_1 = nn.Conv2d(in_channels, c1, kernel_size=1, bias=True)
 
         # Path 2
-        self.p2_1 = nn.Conv2d(in_channels, c2[0], kernel_size=1, bias=True).to(device)
-        self.p2_2 = nn.Conv2d(c2[0], c2[1], kernel_size=3, padding=1, bias=True).to(device)
+        self.p2_1 = nn.Conv2d(in_channels, c2[0], kernel_size=1, bias=True)
+        self.p2_2 = nn.Conv2d(c2[0], c2[1], kernel_size=3, padding=1, bias=True)
 
         # Path 3
-        self.p3_1 = nn.Conv2d(in_channels, c3[0], kernel_size=1, bias=True).to(device)
-        self.p3_2 = nn.Conv2d(c3[0], c3[1], kernel_size=5, padding=2, bias=True).to(device)
+        self.p3_1 = nn.Conv2d(in_channels, c3[0], kernel_size=1, bias=True)
+        self.p3_2 = nn.Conv2d(c3[0], c3[1], kernel_size=5, padding=2, bias=True)
 
         # Path 4
-        self.p4_1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1).to(device)
-        self.p4_2 = nn.Conv2d(in_channels, c4, kernel_size=1, bias=True).to(device)
+        self.p4_1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        self.p4_2 = nn.Conv2d(in_channels, c4, kernel_size=1, bias=True)
 
-        self.batch_norm = nn.BatchNorm2d(c1 + c2[1] + c3[1] + c4).to(device)
-        self.relu = nn.ReLU().to(device)
+        self.batch_norm = nn.BatchNorm2d(c1 + c2[1] + c3[1] + c4)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
-        x=x.to(device)
+        x=x
         p1 = self.p1_1(x)
         p2 = self.p2_2(self.p2_1(x))
         p3 = self.p3_2(self.p3_1(x))
@@ -45,7 +43,7 @@ class TorchInceptionBlock(nn.Module):
 class MindSporeInceptionBlock(nn_ms.Cell):
     def __init__(self, in_channels, c1=16, c2=(32,64), c3=(16,32), c4=16):
         super(MindSporeInceptionBlock, self).__init__()
-        # Path 1
+        # Path del
         self.p1_1 = nn_ms.Conv2d(in_channels, c1, kernel_size=1, has_bias=True)
 
         # Path 2

@@ -76,6 +76,27 @@ INPUTSHAPE=['VGG16','LSTMModel0','AlexNetCIFAR10','DenseNet','LeNet5Fashion','Le
 'LSTMModel2','MobileNet','ResNet50','VGG19','Xception']
 
 
+group_0 = [
+    ('TorchVGG16', 'VGG16'),
+    #('TorchLSTMModel0', 'LSTMModel0'),
+    ('TorchAlexNetCIFAR10', 'AlexNetCIFAR10'),
+    ('TorchDenseNet', 'DenseNet')
+]
+
+group_1 = [
+    ('TorchLeNet5Fashion', 'LeNet5Fashion'),
+    ('TorchLeNet5', 'LeNet5'),
+    #('TorchLSTMModel2', 'LSTMModel2'),
+    ('TorchMobileNet', 'MobileNet')
+]
+
+group_2 = [
+    ('TorchResNet50', 'ResNet50'),
+    ('TorchVGG19', 'VGG19'),
+    ('TorchXception', 'Xception')
+]
+
+
 NUM_CLASSES=100
 
 #LSTMModel2 在ART中会自动改成4维，未解决

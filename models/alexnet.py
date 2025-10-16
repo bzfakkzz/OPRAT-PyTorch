@@ -7,35 +7,34 @@ import troubleshooter as ts
 import mindspore.nn as nn_ms
 import mindspore as ms
 
-device=torch.device('cuda')
 
 # PyTorch AlexNet-CIFAR10模型
 class TorchAlexNetCIFAR10(nn.Module):
     def __init__(self, num_classes=10):
         super(TorchAlexNetCIFAR10, self).__init__()
-        self.conv1 = nn.Conv2d(3, 96, kernel_size=3, stride=2, padding=1).to(device)
-        self.pool1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1).to(device)
-        self.bn1   = nn.BatchNorm2d(96).to(device)
+        self.conv1 = nn.Conv2d(3, 96, kernel_size=3, stride=2, padding=1)
+        self.pool1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.bn1   = nn.BatchNorm2d(96)
 
-        self.conv2 = nn.Conv2d(96, 256, kernel_size=5, padding=2).to(device)
-        self.pool2 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1).to(device)
-        self.bn2   = nn.BatchNorm2d(256).to(device)
+        self.conv2 = nn.Conv2d(96, 256, kernel_size=5, padding=2)
+        self.pool2 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.bn2   = nn.BatchNorm2d(256)
 
-        self.conv3 = nn.Conv2d(256, 384, kernel_size=3, padding=1).to(device)
-        self.conv4 = nn.Conv2d(384, 384, kernel_size=3, padding=1).to(device)
-        self.conv5 = nn.Conv2d(384, 256, kernel_size=3, padding=1).to(device)
-        self.pool3 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1).to(device)
-        self.bn3   = nn.BatchNorm2d(256).to(device)
+        self.conv3 = nn.Conv2d(256, 384, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(384, 384, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(384, 256, kernel_size=3, padding=1)
+        self.pool3 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.bn3   = nn.BatchNorm2d(256)
 
-        self.flatten = nn.Flatten().to(device)
-        self.fc1     = nn.Linear(1024, 4096).to(device)
-        self.dropout1 = nn.Dropout(0.5).to(device)
-        self.fc2     = nn.Linear(4096, 4096).to(device)
-        self.dropout2 = nn.Dropout(0.5).to(device)
-        self.fc3     = nn.Linear(4096, num_classes).to(device)
+        self.flatten = nn.Flatten()
+        self.fc1     = nn.Linear(1024, 4096)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2     = nn.Linear(4096, 4096)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3     = nn.Linear(4096, num_classes)
 
     def forward(self, x):
-        x=x.to(device)
+        x=x
         x = self.conv1(x)
         x = self.pool1(x)
         x = self.bn1(x)

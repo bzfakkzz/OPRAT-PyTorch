@@ -6,8 +6,6 @@ from mindspore import context
 import troubleshooter as ts
 import mindspore.nn as nn_ms
 
-device=torch.device('cuda')
-
 # ---------------------------- DepthwiseSeparableConv2d 定义 ----------------------------
 class MindSporeDepthwiseSeparableConv2d(nn_ms.Cell):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1):
@@ -46,7 +44,7 @@ class MindSporeDepthwiseSeparableConv2d(nn_ms.Cell):
         x = self.relu(x)
         return x
 
-# ---------------------------- 1. PyTorch MobileNet ----------------------------
+# ---------------------------- del. PyTorch MobileNet ----------------------------
 class TorchDepthwiseSeparableConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1):
         super(TorchDepthwiseSeparableConv2d, self).__init__()
@@ -61,8 +59,8 @@ class TorchDepthwiseSeparableConv2d(nn.Module):
             padding=padding,
             groups=in_channels,
             bias=False
-        ).to('cuda')
-        self.bn1 = nn.BatchNorm2d(in_channels).to('cuda')
+        )
+        self.bn1 = nn.BatchNorm2d(in_channels)
 
         # 点卷积 (Pointwise Convolution)
         self.pointwise = nn.Conv2d(
@@ -70,12 +68,12 @@ class TorchDepthwiseSeparableConv2d(nn.Module):
             out_channels,
             kernel_size=1,
             bias=False
-        ).to('cuda')
-        self.bn2 = nn.BatchNorm2d(out_channels).to('cuda')
-        self.relu = nn.ReLU().to('cuda')
+        )
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
-        x=x.to('cuda')
+        x=x
         x = self.depthwise(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -87,35 +85,35 @@ class TorchDepthwiseSeparableConv2d(nn.Module):
 class TorchMobileNet(nn.Module):
     def __init__(self, num_classes=1000):
         super(TorchMobileNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1).to('cuda')
-        self.bn1 = nn.BatchNorm2d(32).to('cuda')
-        self.relu = nn.ReLU().to('cuda')
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.relu = nn.ReLU()
 
         # Depthwise separable convolutions
-        self.conv_dw1 = TorchDepthwiseSeparableConv2d(32, 64, kernel_size=3).to('cuda')
-        self.conv_dw2 = TorchDepthwiseSeparableConv2d(64, 128, kernel_size=3, stride=2).to('cuda')
-        self.conv_dw3 = TorchDepthwiseSeparableConv2d(128, 128, kernel_size=3).to('cuda')
-        self.conv_dw4 = TorchDepthwiseSeparableConv2d(128, 256, kernel_size=3, stride=2).to('cuda')
-        self.conv_dw5 = TorchDepthwiseSeparableConv2d(256, 256, kernel_size=3).to('cuda')
-        self.conv_dw6 = TorchDepthwiseSeparableConv2d(256, 512, kernel_size=3, stride=2).to('cuda')
+        self.conv_dw1 = TorchDepthwiseSeparableConv2d(32, 64, kernel_size=3)
+        self.conv_dw2 = TorchDepthwiseSeparableConv2d(64, 128, kernel_size=3, stride=2)
+        self.conv_dw3 = TorchDepthwiseSeparableConv2d(128, 128, kernel_size=3)
+        self.conv_dw4 = TorchDepthwiseSeparableConv2d(128, 256, kernel_size=3, stride=2)
+        self.conv_dw5 = TorchDepthwiseSeparableConv2d(256, 256, kernel_size=3)
+        self.conv_dw6 = TorchDepthwiseSeparableConv2d(256, 512, kernel_size=3, stride=2)
 
         # Repeat this block 5 times
         self.conv_dw_repeated = nn.Sequential(
             *[TorchDepthwiseSeparableConv2d(512, 512, kernel_size=3) for _ in range(5)]
-        ).to('cuda')
+        )
 
-        self.conv_dw7 = TorchDepthwiseSeparableConv2d(512, 1024, kernel_size=3, stride=2).to('cuda')
-        self.conv_dw8 = TorchDepthwiseSeparableConv2d(1024, 1024, kernel_size=3).to('cuda')
+        self.conv_dw7 = TorchDepthwiseSeparableConv2d(512, 1024, kernel_size=3, stride=2)
+        self.conv_dw8 = TorchDepthwiseSeparableConv2d(1024, 1024, kernel_size=3)
 
-        self.avg_pool = nn.AdaptiveAvgPool2d(1).to('cuda')
-        self.flatten = nn.Flatten().to('cuda')
-        self.fc = nn.Linear(1024, num_classes).to('cuda')
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(1024, num_classes)
 
         # 初始化权重
         self._initialize_weights()
 
     def forward(self, x):
-        x=x.to('cuda')
+        x=x
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)

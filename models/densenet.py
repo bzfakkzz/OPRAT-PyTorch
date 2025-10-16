@@ -7,34 +7,33 @@ import troubleshooter as ts
 import mindspore.nn as nn_ms
 import mindspore.ops as ops
 
-device=torch.device('cuda')
 
-# 1. PyTorch DenseNet-121
+# del. PyTorch DenseNet-121
 class TorchBottleneck(nn.Module):
     expansion = 4
     def __init__(self, in_channels, growth_rate):
         super().__init__()
         inter = growth_rate * self.expansion
-        self.bn1 = nn.BatchNorm2d(in_channels).to(device)
-        self.conv1 = nn.Conv2d(in_channels, inter, 1, bias=False).to(device)
-        self.bn2 = nn.BatchNorm2d(inter).to(device)
-        self.conv2 = nn.Conv2d(inter, growth_rate, 3, padding=1, bias=False).to(device)
+        self.bn1 = nn.BatchNorm2d(in_channels)
+        self.conv1 = nn.Conv2d(in_channels, inter, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(inter)
+        self.conv2 = nn.Conv2d(inter, growth_rate, 3, padding=1, bias=False)
 
     def forward(self, x):
-        out = self.conv1(nn.functional.relu(self.bn1(x))).to(device)
-        out = self.conv2(nn.functional.relu(self.bn2(out))).to(device)
-        return torch.cat([x, out], 1).to(device)
+        out = self.conv1(nn.functional.relu(self.bn1(x)))
+        out = self.conv2(nn.functional.relu(self.bn2(out)))
+        return torch.cat([x, out], 1)
 
 class TorchTransition(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.bn = nn.BatchNorm2d(in_channels).to(device)
-        self.conv = nn.Conv2d(in_channels, out_channels, 1, bias=False).to(device)
-        self.pool = nn.AvgPool2d(2, 2).to(device)
+        self.bn = nn.BatchNorm2d(in_channels)
+        self.conv = nn.Conv2d(in_channels, out_channels, 1, bias=False)
+        self.pool = nn.AvgPool2d(2, 2)
 
     def forward(self, x):
-        x = self.conv(nn.functional.relu(self.bn(x))).to(device)
-        return self.pool(x).to(device)
+        x = self.conv(nn.functional.relu(self.bn(x)))
+        return self.pool(x)
 
 class TorchDenseNet(nn.Module):
     def __init__(self, num_classes=1000, growth_rate=32, block_config=(6, 12, 24, 16)):
@@ -45,13 +44,13 @@ class TorchDenseNet(nn.Module):
             nn.BatchNorm2d(n_init),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2, padding=1)
-        ).to(device)
+        )
 
         n_feat = n_init
         for i, n_layers in enumerate(block_config):
             dense_blk = nn.Sequential(
                 *[TorchBottleneck(n_feat + j * growth_rate, growth_rate) for j in range(n_layers)]
-            ).to(device)
+            )
             self.features.add_module(f"dense_{i}", dense_blk)
             n_feat += n_layers * growth_rate
             if i < len(block_config) - 1:
@@ -66,7 +65,7 @@ class TorchDenseNet(nn.Module):
         self.classifier = nn.Linear(n_feat * 7 * 7, num_classes)
 
     def forward(self, x):
-        x=x.to(device)
+        x=x
         x = self.features(x)
         x = torch.flatten(x, 1)
         return self.classifier(x)

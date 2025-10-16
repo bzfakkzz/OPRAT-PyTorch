@@ -5,23 +5,21 @@ import mindspore.nn as nn_ms
 import torch
 import mindspore as ms
 
-device=torch.device('cuda')
-
 # PyTorch LSTM模型
 class TorchLSTMModel0(nn.Module):
     def __init__(self, num_classes=1):
         super(TorchLSTMModel0, self).__init__()
         self.lstm1 = nn.LSTM(input_size=50, hidden_size=50,
-                             num_layers=1, batch_first=True, bidirectional=False).to('cuda')
-        self.dropout1 = nn.Dropout(0.5).to('cuda')
+                             num_layers=1, batch_first=True, bidirectional=False)
+        self.dropout1 = nn.Dropout(0.5)
         self.lstm2 = nn.LSTM(input_size=50, hidden_size=100,
-                             num_layers=1, batch_first=True, bidirectional=False).to('cuda')
-        self.dropout2 = nn.Dropout(0.5).to('cuda')
-        self.dense = nn.Linear(100, num_classes).to('cuda')
+                             num_layers=1, batch_first=True, bidirectional=False)
+        self.dropout2 = nn.Dropout(0.5)
+        self.dense = nn.Linear(100, num_classes)
         self._initialize_weights()
 
     def forward(self, x):
-        x=x.to('cuda')
+        x=x
         x, _ = self.lstm1(x)
         x = self.dropout1(x)
         x, _ = self.lstm2(x)

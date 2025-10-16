@@ -6,71 +6,69 @@ import torch
 import mindspore as ms
 from mindspore import context
 
-device=torch.device('cuda')
-
-# ---------------------------- 1. PyTorch VGG19 ----------------------------
+# ---------------------------- del. PyTorch VGG19 ----------------------------
 class TorchVGG19(nn.Module):
     def __init__(self, num_classes=1000):
         super(TorchVGG19, self).__init__()
         # Block1
-        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=1).to('cuda')
-        self.relu1_1 = nn.ReLU().to('cuda')
-        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1).to('cuda')
-        self.relu1_2 = nn.ReLU().to('cuda')
-        self.maxpool1 = nn.MaxPool2d(2, 2).to('cuda')
+        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=1)
+        self.relu1_1 = nn.ReLU()
+        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
+        self.relu1_2 = nn.ReLU()
+        self.maxpool1 = nn.MaxPool2d(2, 2)
 
         # Block2
-        self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1).to('cuda')
-        self.relu2_1 = nn.ReLU().to('cuda')
-        self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1).to('cuda')
-        self.relu2_2 = nn.ReLU().to('cuda')
-        self.maxpool2 = nn.MaxPool2d(2, 2).to('cuda')
+        self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1)
+        self.relu2_1 = nn.ReLU()
+        self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1)
+        self.relu2_2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(2, 2)
 
         # Block3
-        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1).to('cuda')
-        self.relu3_1 = nn.ReLU().to('cuda')
-        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1).to('cuda')
-        self.relu3_2 = nn.ReLU().to('cuda')
-        self.conv3_3 = nn.Conv2d(256, 256, 3, padding=1).to('cuda')
-        self.relu3_3 = nn.ReLU().to('cuda')
-        self.conv3_4 = nn.Conv2d(256, 256, 3, padding=1).to('cuda')  # VGG19增加的层
-        self.relu3_4 = nn.ReLU().to('cuda')  # VGG19增加的层
-        self.maxpool3 = nn.MaxPool2d(2, 2).to('cuda')
+        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1)
+        self.relu3_1 = nn.ReLU()
+        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1)
+        self.relu3_2 = nn.ReLU()
+        self.conv3_3 = nn.Conv2d(256, 256, 3, padding=1)
+        self.relu3_3 = nn.ReLU()
+        self.conv3_4 = nn.Conv2d(256, 256, 3, padding=1)  # VGG19增加的层
+        self.relu3_4 = nn.ReLU()  # VGG19增加的层
+        self.maxpool3 = nn.MaxPool2d(2, 2)
 
         # Block4
-        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1).to('cuda')
-        self.relu4_1 = nn.ReLU().to('cuda')
-        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')
-        self.relu4_2 = nn.ReLU().to('cuda')
-        self.conv4_3 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')
-        self.relu4_3 = nn.ReLU().to('cuda')
-        self.conv4_4 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')  # VGG19增加的层
-        self.relu4_4 = nn.ReLU().to('cuda')  # VGG19增加的层
-        self.maxpool4 = nn.MaxPool2d(2, 2).to('cuda')
+        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1)
+        self.relu4_1 = nn.ReLU()
+        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1)
+        self.relu4_2 = nn.ReLU()
+        self.conv4_3 = nn.Conv2d(512, 512, 3, padding=1)
+        self.relu4_3 = nn.ReLU()
+        self.conv4_4 = nn.Conv2d(512, 512, 3, padding=1)  # VGG19增加的层
+        self.relu4_4 = nn.ReLU()  # VGG19增加的层
+        self.maxpool4 = nn.MaxPool2d(2, 2)
 
         # Block5
-        self.conv5_1 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')
-        self.relu5_1 = nn.ReLU().to('cuda')
-        self.conv5_2 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')
-        self.relu5_2 = nn.ReLU().to('cuda')
-        self.conv5_3 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')
-        self.relu5_3 = nn.ReLU().to('cuda')
-        self.conv5_4 = nn.Conv2d(512, 512, 3, padding=1).to('cuda')  # VGG19增加的层
-        self.relu5_4 = nn.ReLU().to('cuda')  # VGG19增加的层
-        self.maxpool5 = nn.MaxPool2d(2, 2).to('cuda')
+        self.conv5_1 = nn.Conv2d(512, 512, 3, padding=1)
+        self.relu5_1 = nn.ReLU()
+        self.conv5_2 = nn.Conv2d(512, 512, 3, padding=1)
+        self.relu5_2 = nn.ReLU()
+        self.conv5_3 = nn.Conv2d(512, 512, 3, padding=1)
+        self.relu5_3 = nn.ReLU()
+        self.conv5_4 = nn.Conv2d(512, 512, 3, padding=1)  # VGG19增加的层
+        self.relu5_4 = nn.ReLU()  # VGG19增加的层
+        self.maxpool5 = nn.MaxPool2d(2, 2)
 
         # Classifier
-        self.flatten = nn.Flatten().to('cuda')
-        self.fc1 = nn.Linear(512 * 7 * 7, 4096).to('cuda')
-        self.relu_fc1 = nn.ReLU().to('cuda')
-        self.dropout1 = nn.Dropout(0.5).to('cuda')
-        self.fc2 = nn.Linear(4096, 4096).to('cuda')
-        self.relu_fc2 = nn.ReLU().to('cuda')
-        self.dropout2 = nn.Dropout(0.5).to('cuda')
-        self.fc3 = nn.Linear(4096, num_classes).to('cuda')
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(512 * 7 * 7, 4096)
+        self.relu_fc1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(4096, 4096)
+        self.relu_fc2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(4096, num_classes)
 
     def forward(self, x):
-        x=x.to('cuda')
+        x=x
         # Block1
         x = self.relu1_1(self.conv1_1(x))
         x = self.relu1_2(self.conv1_2(x))
