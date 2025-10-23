@@ -1,5 +1,3 @@
-
-
 def CountInSeq(S,C,attacks):
     count_min=1000
     for j in C:

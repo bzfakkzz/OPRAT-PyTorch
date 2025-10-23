@@ -77,23 +77,20 @@ INPUTSHAPE=['VGG16','LSTMModel0','AlexNetCIFAR10','DenseNet','LeNet5Fashion','Le
 
 
 group_0 = [
-    ('TorchVGG16', 'VGG16'),
     #('TorchLSTMModel0', 'LSTMModel0'),
     ('TorchAlexNetCIFAR10', 'AlexNetCIFAR10'),
-    ('TorchDenseNet', 'DenseNet')
+    ('TorchDenseNet', 'DenseNet'),
+    ('TorchLeNet5Fashion', 'LeNet5Fashion'),
+    ('TorchVGG16', 'VGG16')
 ]
 
 group_1 = [
-    ('TorchLeNet5Fashion', 'LeNet5Fashion'),
     ('TorchLeNet5', 'LeNet5'),
     #('TorchLSTMModel2', 'LSTMModel2'),
-    ('TorchMobileNet', 'MobileNet')
-]
-
-group_2 = [
+    #('TorchMobileNet', 'MobileNet'), DeepFool攻击收敛效果不明显
     ('TorchResNet50', 'ResNet50'),
-    ('TorchVGG19', 'VGG19'),
-    ('TorchXception', 'Xception')
+    #('TorchVGG19', 'VGG19'), 攻击成功率一直为0，同样卡在DeepFool，跑了一下午只有4轮
+    #('TorchXception', 'Xception')
 ]
 
 

@@ -9,15 +9,15 @@ import troubleshooter as ts
 from typing import List, Dict, Set, Tuple, Any
 import numpy as np
 import torch
-import mindspore as ms
-from mindspore import context
+# import mindspore as ms
+# from mindspore import context
 
-from Compare.Compare import InferAndCompare, InferAndCompareSingleModel
+from Compare.Compare import InferAndCompare, InferAndCompareSingleModel, InferAndCompareSingleModel1
 from Compare.Count import CountInSeq
 from models import convert_weights
 from attacks import generate_adversarial_samples, create_pytorch_classifier
 from data.getdata import generate_random_data
-import torch
+import pandas as pd
 import argparse
 
 import os
@@ -26,7 +26,7 @@ import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
-from config import model_map, NUM_CLASSES, group_0, group_1, group_2
+from config import model_map, NUM_CLASSES, group_0, group_1
 
 # 辅助函数：生成numpy数组的哈希值
 def numpy_to_hash(arr):
@@ -61,7 +61,7 @@ def load_initial_seed_data(model_path):
     return None, None
 
 parser = argparse.ArgumentParser(description='运行模型组')
-parser.add_argument('--group', type=int, required=True, choices=[0, 1, 2], help='要运行的组号 (0, 1, 或 2)')
+parser.add_argument('--group', type=int, required=True, choices=[0, 1], help='要运行的组号 (0, 1)')
 parser.add_argument('--gpu', type=int, required=True, help='指定使用的GPU卡号')
 args = parser.parse_args()
 
@@ -69,18 +69,14 @@ if args.group == 0:
     models_to_run = group_0
 elif args.group == 1:
     models_to_run = group_1
-else:
-    models_to_run = group_2
 
 #context.set_context(mode=context.PYNATIVE_MODE, device_target="GPU")
 device = torch.device(f'cuda:{args.gpu}')
 print(f"使用GPU设备: cuda:{args.gpu}")
 
-#device = torch.device('cuda')
 batch_size = 30
 
 for Torch_model, input_shape in models_to_run:
-
     print("-----------------------------------------------------------------------------\n")
     print(f"{input_shape}模型运行中....")
     print("-----------------------------------------------------------------------------\n")
@@ -161,7 +157,7 @@ for Torch_model, input_shape in models_to_run:
         end = time.perf_counter()
         print(f"运行时间: {end - start:.6f} 秒")
 
-        cnt, diff_indices, original_pred_labels, attack_pred_labels, new_numpy_to_path = InferAndCompareSingleModel(
+        cnt1, diff_indices, cnt2, same_indices, new_numpy_to_path = InferAndCompareSingleModel(
             torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", 0, attack, numpy_to_path)
         
         # 更新numpy_to_path字典
@@ -169,7 +165,7 @@ for Torch_model, input_shape in models_to_run:
         
         D_new = attack_data[diff_indices]
 
-        T[attack] = cnt
+        T[attack] = cnt1
         H[attack] = 0
         
         # 将新生成的攻击数据添加到种子池中
@@ -183,13 +179,12 @@ for Torch_model, input_shape in models_to_run:
     print("初始化结束...")
 
     # 初始化文件
-    with open(f"{model_path}/model_robustness_stats.csv", 'w', newline='', encoding='utf-8') as f:
+    with open(f"{model_path}/Different/first_attack/model_robustness_stats.csv", 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(["Round", "Succ", "All", "Prob"])
-
-    with open(f"{model_path}/model_robustness_details.csv", 'w', newline='', encoding='utf-8') as f:
+        writer.writerow(["Round", "Cnt", "All", "Prob"])
+    with open(f"{model_path}/Same/first_attack/model_robustness_stats.csv", 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(["Round", "Index", "True Label", "Predict Label"])
+        writer.writerow(["Round", "Cnt", "All", "Prob"])
 
     for execution_round in range(execution_rounds):
         if len(all_seed_data) <= batch_size:
@@ -220,18 +215,17 @@ for Torch_model, input_shape in models_to_run:
         classifier = create_pytorch_classifier(torch_model, model_map[input_shape], NUM_CLASSES)
         attack_data = generate_adversarial_samples(attack, classifier, test_data)
 
-        cnt, diff_indices, original_pred_labels, attack_pred_labels, new_numpy_to_path = InferAndCompareSingleModel(
+        cnt1, diff_indices, cnt2, same_indices, new_numpy_to_path = InferAndCompareSingleModel(
             torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", gen, attack, numpy_to_path)
         
         # 更新numpy_to_path字典
         numpy_to_path.update(new_numpy_to_path)
         
         D_new = attack_data[diff_indices]
-        cnt1 = cnt  # 成功攻击数据个数
-        cnt2 = len(attack_data)  # 所有攻击数据个数
+        all = len(attack_data)  # 所有攻击数据个数
 
         H[attack] = T[attack]
-        T[attack] = cnt
+        T[attack] = cnt1
         
         # 将新生成的攻击数据添加到种子池中
         if len(D_new) > 0:
@@ -244,15 +238,12 @@ for Torch_model, input_shape in models_to_run:
         D_diff.extend(D_new)
 
         # 写入统计信息
-        with open(f"{model_path}/model_robustness_stats.csv", 'a', newline='', encoding='utf-8') as f:
+        with open(f"{model_path}/Different/first_attack/model_robustness_stats.csv", 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow([f"{gen}", cnt1, cnt2, 1.0 * cnt1 / cnt2])
-
-        # 写入详细结果
-        with open(f"{model_path}/model_robustness_details.csv", 'a', newline='', encoding='utf-8') as f:
+            writer.writerow([f"{gen}", cnt1, all, 1.0 * cnt1 / all])
+        with open(f"{model_path}/Same/first_attack/model_robustness_stats.csv", 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            for i in diff_indices:
-                writer.writerow([f"{gen}", i, original_pred_labels[i], attack_pred_labels[i]])
+            writer.writerow([f"{gen}", cnt2, all, 1.0 * cnt2 / all])
 
     # 保存最终的numpy到路径映射
     mapping_path = os.path.join(f"{model_path}/adversarial_samples", "numpy_to_path_mapping.pkl")
@@ -260,3 +251,234 @@ for Torch_model, input_shape in models_to_run:
         pickle.dump(numpy_to_path, f)
 
     print("推理轮次结束...")
+
+# 定义扰动参数
+a=['fp64','fp32','fp16']
+dev=[torch.device(f'cuda:{args.gpu}'), torch.device('cpu')]
+f=[]
+
+a1 = ['fp64','fp64','fp32','fp32','fp16','fp16']
+a2 = ['fp32','fp16','fp64','fp16','fp32','fp64']
+dev1 = [torch.device(f'cuda:{args.gpu}'), torch.device('cpu')]
+dev2 = [torch.device('cpu'), torch.device(f'cuda:{args.gpu}')]
+f1=['000','001','010','011','100','101','110','111']
+f2=['000','001','010','011','100','101','110','111']
+dx=['00','01','10','11']
+
+for i in range(2):
+    for j in range(2):
+        for k in range(2):
+            for o in range(2):
+                f.append(str(i)+str(j)+str(k)+str(o))
+
+def run2(op):
+    if op==0:
+        sss='Different'
+        ssss='Same'
+    else: 
+        sss='Same'
+        ssss='Different'
+    
+    for Torch_model, input_shape in models_to_run:
+        print("-----------------------------------------------------------------------------")
+        print(f"对{input_shape}模型进行二次扰动攻击(统计{sss})....")
+        print("-----------------------------------------------------------------------------")
+
+        model_path = f'PyTorch/{Torch_model}'
+        file_path = os.path.join(model_path, f'{sss}/first_attack/adversarial_log.csv')
+
+        os.makedirs(f'PyTorch/{Torch_model}/{sss}/re_attack',exist_ok=True)
+        dir_path = f'PyTorch/{Torch_model}/{sss}/re_attack'
+
+        dir_path1=os.path.join(dir_path,'Compile')
+        dir_path2=os.path.join(dir_path,'Precision')
+        dir_path3=os.path.join(dir_path,'Device')
+
+        os.makedirs(dir_path1)
+        os.makedirs(dir_path2)
+        os.makedirs(dir_path3)
+
+        os.makedirs(os.path.join(dir_path1,'details'))
+        os.makedirs(os.path.join(dir_path2,'details'))
+        os.makedirs(os.path.join(dir_path3,'details'))
+
+        os.makedirs(os.path.join(dir_path1,'label_change'))
+        os.makedirs(os.path.join(dir_path2,'label_change'))
+        os.makedirs(os.path.join(dir_path3,'label_change'))
+
+        f1_path=os.path.join(dir_path,'Compile/re_attack_stats.csv')
+        f2_path=os.path.join(dir_path,'Device/re_attack_stats.csv')
+        f3_path=os.path.join(dir_path,'Precision/re_attack_stats.csv')
+
+        with open(f1_path, 'w', newline='', encoding='utf-8') as f:
+            writer=csv.writer(f)
+            writer.writerow(['(Precision_Test, Precision_Attack)',
+                        '(Device_Test, Device_Attack)',
+                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
+                        'Total_cnt',f'{ssss}_cnt','Prob'])
+        with open(f2_path, 'w', newline='', encoding='utf-8') as f:
+            writer=csv.writer(f)
+            writer.writerow(['(Precision_Test, Precision_Attack)',
+                        '(Device_Test, Device_Attack)',
+                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
+                        'Total_cnt',f'{ssss}_cnt','Prob'])
+        with open(f3_path, 'w', newline='', encoding='utf-8') as f:
+            writer=csv.writer(f)
+            writer.writerow(['(Precision_Test, Precision_Attack)',
+                        '(Device_Test, Device_Attack)',
+                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
+                        'Total_cnt',f'{ssss}_cnt','Prob'])
+        
+        df = pd.read_csv(file_path)
+        sample_paths = df['Sample_Path'].tolist()
+        seed_paths = df['Seed_Path'].tolist()
+        sample_labels=df['Sample_Label'].tolist()
+        seed_labels=df['Seed_Label'].tolist()
+        
+        # 遍历所有扰动组合
+        for i in range(len(a)):
+            for j in range(len(dev)):
+                for o in range(len(f1)):
+                    for k in range(4):
+                        for q in range(len(dx)):
+                            str1=list(f1[k])
+                            str2=list(f2[k])
+                            str1.insert(k,dx[q][0])
+                            str2.insert(k,dx[q][1])
+                            str1=''.join(str1)
+                            str2=''.join(str2)
+
+                            total, same = InferAndCompareSingleModel1(
+                                model_map[Torch_model](num_classes=NUM_CLASSES), 
+                                seed_paths,
+                                sample_paths,
+                                seed_labels,
+                                sample_labels,
+                                a[i], a[i], 
+                                dev[j], dev[j], 
+                                str1, str2,
+                                dir_path1,
+                                op
+                            )
+
+                            with open(f1_path, 'a', newline='', encoding='utf-8') as f:
+                                writer=csv.writer(f)
+                                writer.writerow([f'({a[i]},{a[i]})',f'({str(dev[j])},{str(dev[j])})',
+                                            f'({str1},{str2})',total,same,same*1.0/total])
+
+        
+        for j in range(len(dev)):
+            for k in range(len(f)):
+                for i in range(len(a1)):
+                    total, same = InferAndCompareSingleModel1(
+                        model_map[Torch_model](num_classes=NUM_CLASSES), 
+                        seed_paths,
+                        sample_paths,
+                        seed_labels,
+                        sample_labels,
+                        a1[i], a1[i], 
+                        dev[j], dev[j], 
+                        f[k], f[k],
+                        dir_path2,
+                        op
+                    )
+
+                    with open(f2_path, 'a', newline='', encoding='utf-8') as f:
+                        writer=csv.writer(f)
+                        writer.writerow([f'({a1[i]},{a1[i]})',f'({str(dev[j])},{str(dev[j])})',
+                                    f'({f[k]},{f[k]})',total,same,same*1.0/total])
+                    
+                    total, same = InferAndCompareSingleModel1(
+                        model_map[Torch_model](num_classes=NUM_CLASSES), 
+                        seed_paths,
+                        sample_paths,
+                        seed_labels,
+                        sample_labels,
+                        a1[i], a2[i], 
+                        dev[j], dev[j], 
+                        f[k], f[k],
+                        dir_path2,
+                        op
+                    )
+
+                    with open(f2_path, 'a', newline='', encoding='utf-8') as f:
+                        writer=csv.writer(f)
+                        writer.writerow([f'({a1[i]},{a2[i]})',f'({str(dev[j])},{str(dev[j])})',
+                                    f'({f[k]},{f[k]})',total,same,same*1.0/total])
+                        
+                    total, same = InferAndCompareSingleModel1(
+                        model_map[Torch_model](num_classes=NUM_CLASSES), 
+                        seed_paths,
+                        sample_paths,
+                        seed_labels,
+                        sample_labels,
+                        a2[i], a2[i], 
+                        dev[j], dev[j], 
+                        f[k], f[k],
+                        dir_path2,
+                        op
+                    )
+
+                    with open(f2_path, 'a', newline='', encoding='utf-8') as f:
+                        writer=csv.writer(f)
+                        writer.writerow([f'({a2[i]},{a2[i]})',f'({str(dev[j])},{str(dev[j])})',
+                                    f'({f[k]},{f[k]})',total,same,same*1.0/total])
+
+        for i in range(len(a)):
+                for k in range(len(f)):
+                    for j in range(len(dev1)):
+                        total, same = InferAndCompareSingleModel1(
+                            model_map[Torch_model](num_classes=NUM_CLASSES), 
+                            seed_paths,
+                            sample_paths,
+                            seed_labels,
+                            sample_labels,
+                            a[i], a[i], 
+                            dev1[j], dev1[j], 
+                            f[k], f[k],
+                            dir_path3,
+                            op
+                        )
+
+                        with open(f3_path, 'a', newline='', encoding='utf-8') as f:
+                            writer=csv.writer(f)
+                            writer.writerow([f'({a[i]},{a[i]})',f'({str(dev1[j])},{str(dev1[j])})',
+                                        f'({f[k]},{f[k]})',total,same,same*1.0/total])
+                        
+                        total, same = InferAndCompareSingleModel1(
+                            model_map[Torch_model](num_classes=NUM_CLASSES), 
+                            seed_paths,
+                            sample_paths,
+                            seed_labels,
+                            sample_labels,
+                            a[i], a[i], 
+                            dev1[j], dev2[j], 
+                            f[k], f[k],
+                            dir_path3,
+                            op
+                        )
+
+                        with open(f3_path, 'a', newline='', encoding='utf-8') as f:
+                            writer=csv.writer(f)
+                            writer.writerow([f'({a[i]},{a[i]})',f'({str(dev1[j])},{str(dev2[j])})',
+                                        f'({f[k]},{f[k]})',total,same,same*1.0/total])
+                            
+                        total, same = InferAndCompareSingleModel1(
+                            model_map[Torch_model](num_classes=NUM_CLASSES), 
+                            seed_paths,
+                            sample_paths,
+                            seed_labels,
+                            sample_labels,
+                            a[i], a[i], 
+                            dev2[j], dev2[j], 
+                            f[k], f[k],
+                            dir_path3,
+                            op
+                        )
+
+                        with open(f3_path, 'a', newline='', encoding='utf-8') as f:
+                            writer=csv.writer(f)
+                            writer.writerow([f'({a[i]},{a[i]})',f'({str(dev2[j])},{str(dev2[j])})',
+                                        f'({f[k]},{f[k]})',total,same,same*1.0/total])
+run2(0)
+run2(1)
