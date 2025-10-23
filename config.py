@@ -85,12 +85,12 @@ group_0 = [
 ]
 
 group_1 = [
-    ('TorchLeNet5', 'LeNet5'),
-    #('TorchLSTMModel2', 'LSTMModel2'),
-    #('TorchMobileNet', 'MobileNet'), DeepFool攻击收敛效果不明显
-    ('TorchResNet50', 'ResNet50'),
-    #('TorchVGG19', 'VGG19'), 攻击成功率一直为0，同样卡在DeepFool，跑了一下午只有4轮
-    #('TorchXception', 'Xception')
+    # ('TorchLeNet5', 'LeNet5'),
+    # #('TorchLSTMModel2', 'LSTMModel2'),
+    # #('TorchMobileNet', 'MobileNet'), DeepFool攻击收敛效果不明显
+    # ('TorchResNet50', 'ResNet50'),
+    # #('TorchVGG19', 'VGG19'), 攻击成功率一直为0，同样卡在DeepFool，跑了一下午只有4轮
+    ('TorchXception', 'Xception')
 ]
 
 

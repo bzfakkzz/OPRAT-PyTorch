@@ -45,7 +45,7 @@ def InferAndCompare(torch_model, ms_model, data, device=None):
 
     return count, D_new
 
-def InferAndCompareSingleModel(model, test_data, attack_data, device, path, epoch, attack, numpy_to_path=None):
+def InferAndCompareSingleModel(model, test_data, attack_data, device, path, epoch, attack, numpy_to_path=None, model_path=None):
     model.eval()
     if device is None:
         device = next(model.parameters()).device
@@ -131,7 +131,7 @@ def InferAndCompareSingleModel(model, test_data, attack_data, device, path, epoc
 
             # 记录日志 - 只有在epoch不为0时才记录
             if epoch:
-                log_adversarial_sample(epoch, attack, i, sample_path, seed_path, attack_pred_labels[i], original_pred_labels[i],0)
+                log_adversarial_sample(epoch, attack, i, sample_path, seed_path, attack_pred_labels[i], original_pred_labels[i],0,model_path)
 
         for i, sample_tensor in enumerate(attack_data_tensor[same_indices]):
             # 使用CPU保存以减少GPU内存占用
@@ -172,15 +172,15 @@ def InferAndCompareSingleModel(model, test_data, attack_data, device, path, epoc
 
             # 记录日志 - 只有在epoch不为0时才记录
             if epoch:
-                log_adversarial_sample(epoch, attack, i, sample_path, seed_path, attack_pred_labels[i], original_pred_labels[i],1)
+                log_adversarial_sample(epoch, attack, i, sample_path, seed_path, attack_pred_labels[i], original_pred_labels[i],1,model_path)
 
     return len(diff_indices), diff_indices, len(same_indices), same_indices, new_numpy_to_path
 
-def log_adversarial_sample(round_num, attack, sample_index, sample_path, seed_path, label1, label2,op):
+def log_adversarial_sample(round_num, attack, sample_index, sample_path, seed_path, label1, label2,op, model_path):
     if op==0:sss='Different'
     else:sss='Same'
 
-    log_file = os.path.join(os.path.dirname(sample_path), f"{sss}/first_attack/adversarial_log.csv")
+    log_file = os.path.join(f"{model_path}", f"{sss}/first_attack/adversarial_log.csv")
     header = ["Round", "Attack", "Sample_Index", "Sample_Path", "Seed_Path", "(Seed_label, Sample_label)"]
 
     # 如果文件不存在，创建并写入表头

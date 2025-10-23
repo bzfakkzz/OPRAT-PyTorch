@@ -82,9 +82,17 @@ for Torch_model, input_shape in models_to_run:
     print("-----------------------------------------------------------------------------\n")
 
     model_path = f'PyTorch/{Torch_model}'
+
     os.makedirs(model_path, exist_ok=True)
     os.makedirs(f'{model_path}/adversarial_samples', exist_ok=True)
     os.makedirs(f'{model_path}/adversarial_samples/seed_data', exist_ok=True)
+    os.makedirs(f'{model_path}/Different', exist_ok=True)
+    os.makedirs(f'{model_path}/Different/first_attack', exist_ok=True)
+    os.makedirs(f'{model_path}/Different/re_attack', exist_ok=True)
+    os.makedirs(f'{model_path}/Same', exist_ok=True)
+    os.makedirs(f'{model_path}/Same/first_attack', exist_ok=True)
+    os.makedirs(f'{model_path}/Same/re_attack', exist_ok=True)
+
 
     # 准备
     attack_techniques = ['FGM', 'PGD', 'CW', 'DeepFool', 'Universal']  # 'HopSkipJump'] #HopSkipJump时间太长了（需要1.5-3小时）
@@ -158,7 +166,8 @@ for Torch_model, input_shape in models_to_run:
         print(f"运行时间: {end - start:.6f} 秒")
 
         cnt1, diff_indices, cnt2, same_indices, new_numpy_to_path = InferAndCompareSingleModel(
-            torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", 0, attack, numpy_to_path)
+            torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", 0, attack, numpy_to_path,
+            model_path)
         
         # 更新numpy_to_path字典
         numpy_to_path.update(new_numpy_to_path)
@@ -216,7 +225,8 @@ for Torch_model, input_shape in models_to_run:
         attack_data = generate_adversarial_samples(attack, classifier, test_data)
 
         cnt1, diff_indices, cnt2, same_indices, new_numpy_to_path = InferAndCompareSingleModel(
-            torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", gen, attack, numpy_to_path)
+            torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", gen, attack, numpy_to_path,
+            model_path)
         
         # 更新numpy_to_path字典
         numpy_to_path.update(new_numpy_to_path)
