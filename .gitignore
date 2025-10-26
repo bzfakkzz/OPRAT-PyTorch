@@ -1,0 +1,8 @@
+*.pth
+*.npy
+*.zip
+*.tar.gz
+*.h5
+*.pt
+*.bin
+*.data-*-of-*

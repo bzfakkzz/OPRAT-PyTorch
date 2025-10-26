@@ -181,7 +181,7 @@ def log_adversarial_sample(round_num, attack, sample_index, sample_path, seed_pa
     else:sss='Same'
 
     log_file = os.path.join(f"{model_path}", f"{sss}/first_attack/adversarial_log.csv")
-    header = ["Round", "Attack", "Sample_Index", "Sample_Path", "Seed_Path", "(Seed_label, Sample_label)"]
+    header = ["Round", "Attack", "Sample_Index", "Sample_Path", "Seed_Path", "Seed_Label", "Sample_Label"]
 
     # 如果文件不存在，创建并写入表头
     if not os.path.exists(log_file):
@@ -192,7 +192,7 @@ def log_adversarial_sample(round_num, attack, sample_index, sample_path, seed_pa
     # 追加记录
     with open(log_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow([round_num, attack, sample_index, sample_path, seed_path,f'({label1}, {label2})'])
+        writer.writerow([round_num, attack, sample_index, sample_path, seed_path,label1, label2])
 
 @contextlib.contextmanager
 def set_inductor_env_vars(str):
@@ -259,6 +259,7 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
 
     # 初始化结果列表
     same_indices = []
+    label_change=0
 
     # 保存结果
     dev1_str = str(device1).replace(':', '').replace('/', '')
@@ -317,6 +318,7 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
                                 wri.writerow([i,test_data_paths[i], attack_data_paths[i],
                                               f'({test_data_labels[i]},{attack_data_labels[i]})',
                                               f'({original_pred_labels[0].item()}, {attack_pred_labels[0].item()})'])
+                                label_change+=1
                     else:
                         if original_pred_labels[0].item() == attack_pred_labels[0].item():
                             same_indices.append(i)
@@ -328,6 +330,7 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
                                 wri.writerow([i,test_data_paths[i], attack_data_paths[i],
                                               f'({test_data_labels[i]},{attack_data_labels[i]})',
                                               f'({original_pred_labels[0].item()}, {attack_pred_labels[0].item()})'])
+                                label_change+=1
                 else:
                     if(original_pred_labels.size(0)>1):
                         flag=True
@@ -345,6 +348,7 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
                                 wri.writerow([i,test_data_paths[i], attack_data_paths[i],
                                               f'({test_data_labels[i]},{attack_data_labels[i]})',
                                               f'({original_pred_labels[0].item()}, {attack_pred_labels[0].item()})'])
+                                label_change+=1
                     else:
                         if original_pred_labels[0].item() != attack_pred_labels[0].item():
                             same_indices.append(i)
@@ -356,6 +360,7 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
                                 wri.writerow([i,test_data_paths[i], attack_data_paths[i],
                                               f'({test_data_labels[i]},{attack_data_labels[i]})',
                                               f'({original_pred_labels[0].item()}, {attack_pred_labels[0].item()})'])
+                                label_change+=1
                     
                 # 打印进度
                 if (i + 1) % 100 == 0:
@@ -367,4 +372,4 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
     print(f"Completed processing {total_samples} samples")
     print(f"Same predictions: {same_predictions} ({same_predictions/total_samples*100:.2f}%)")
     
-    return total_samples, same_predictions
+    return total_samples, same_predictions, label_change

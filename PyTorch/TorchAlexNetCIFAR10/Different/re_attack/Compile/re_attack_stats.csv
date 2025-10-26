@@ -1,0 +1,3 @@
+"(Precision_Test, Precision_Attack)","(Device_Test, Device_Attack)","(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))",Total_cnt,Same_cnt,Prob
+"(fp64,fp64)","(cuda:0,cuda:0)","(0000,0000)",2840,2211,0.7785211267605634
+"(fp64,fp64)","(cuda:0,cuda:0)","(0000,1000)",2840,2840,1.0
