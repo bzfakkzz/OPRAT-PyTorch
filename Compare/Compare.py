@@ -370,6 +370,6 @@ def InferAndCompareSingleModel1(model, test_data_paths, attack_data_paths, test_
     same_predictions = len(same_indices)
     
     print(f"Completed processing {total_samples} samples")
-    print(f"Same predictions: {same_predictions} ({same_predictions/total_samples*100:.2f}%)")
+    print(f"Change predictions: {same_predictions} ({same_predictions/total_samples*100:.2f}%)")
     
     return total_samples, same_predictions, label_change
