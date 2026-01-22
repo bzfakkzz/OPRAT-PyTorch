@@ -94,3 +94,9 @@
 * 统计汇总: 查看各子目录下的 `model_robustness_stats.csv` 和 `label_change_stats.csv`。
 
 * 针对当前框架下各个模型的统计总结果在“summary.xlsx”中。
+
+**已知问题:**
+
+* MindSpore 版本因服务器环境兼容性问题正在重构中
+
+* DeepFool 攻击在 VGG19 上由于显存限制可能会超时
