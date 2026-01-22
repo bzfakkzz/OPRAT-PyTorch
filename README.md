@@ -1,20 +1,96 @@
-### 实验结果说明：
+### OPRAT-PyTorch: 深度学习模型鲁棒性评估与模糊测试框架
+
+本项目实现了一个针对 PyTorch 模型的自动化鲁棒性评估框架（OPRAT）。通过对抗攻击生成（Fuzzing）与环境消融实验（Stability Analysis），系统地评估模型在不同编译选项、精度和硬件设备下的行为一致性与鲁棒性。
+
+![](assets/img.png)
 
 
 
-中间运行结果全部存放在PyTorch文件夹中，发现Same文件夹中的re_attack没有成功传上去，传上去的也疑似是几天前的老数据，不过服务器上保存了。<br>以后会把数据直接放在别的网站上比如figshare。<br>
-总结果在“触发框架鲁棒性问题汇总.xlsx”中。
+**目录结构说明：**   <img title="" src="assets/Structure.png" alt="Structure.png" style="zoom:33%;" data-align="center">
 
+**注意**：
 
+1. 由于 `.pth` (模型权重) 和 `.npy` (攻击样本) 文件体积过大，默认不上传至 GitHub。
 
-关于中间运行结果：
+2. 完整汇总结果请参考根目录下的 `触发框架鲁棒性问题汇总.xlsx`。
 
-1. batch_size=30，epoch=100，一共3000个测试用例
-2. 在第一次攻击时，我们使用PyTorch默认环境，此时精度默认float32，device为torch.device('cuda')，torch.compile()参数默认全部。
-   在第二次攻击时，我们使用设置的参数进行消融实验。
-3. 记录change_label时只记录：
-   (1) 原先攻击成功，现在依旧攻击成功但是对于攻击数据label改变的（Different）
-   (2) 原先攻击失败，现在依旧攻击失败但是对于攻击数据label改变的（Same）
-4. 第二次攻击时，details子文件夹和label_change子文件夹中的文件名就是我们设置的环境
-5. 具体文件夹结构如下图所示，.pth和.npy文件过大，传的时候会出错，因此没有传上GitHub
-   ![Structure.png](Structure.png)
+3. 原始数据后续将托管于 Figshare。
+   
+   
+
+**快速开始：**
+
+1. 环境准备：确保已安装 Python 3.8+ 及 PyTorch 环境。
+   
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. 运行测试
+   使用 `main.py` 启动测试。脚本支持断点续传，会自动加载已有的攻击样本。
+   参数说明：
+   
+   * `--group`: 模型组编号 (0 或 1，详见 `config.py`)
+   
+   * `--gpu`: 指定使用的 GPU ID
+   
+   * `--mode`: 运行模式
+     
+     * `fuzz`: 仅运行第一阶段（对抗攻击生成）
+     
+     * `stability`: 仅运行第二阶段（稳定性/消融实验）
+     
+     * `all`: 顺序运行所有阶段（默认）
+   
+   运行示例：
+   
+   ```bash
+   # 在 GPU 0 上运行第 0 组模型的所有测试阶段
+   python main.py --group 0 --gpu 0 --mode all
+   ```
+   
+   
+
+**实验设置与逻辑：**
+
+1. 基本参数
+* Batch Size: 30
+
+* Rounds: 100 轮次
+
+* Total Test Cases: 3000 个测试样本
+2. 第一阶段：初始攻击 (First Attack)
+
+在标准 PyTorch 默认环境下生成对抗样本：
+
+* Precision: Float32（PyTorch框架下默认Float32）
+
+* Device: CUDA
+
+* Compile: 默认参数 (`torch.compile()`)
+3. 第二阶段：稳定性消融 (Re-Attack)
+
+使用第一阶段生成的样本，在不同环境下进行二次推理，检测模型行为的不一致性（Label Change）：
+
+* Compile Test: 测试不同的后端优化参数 (`fallback_random`, `epilogue_fusion` 等)。
+
+* Device Test: 对比 CPU 与 CUDA 的推理差异。
+
+* Precision Test: 对比 FP16 与 FP32 的推理差异。
+4. 标签变化记录标准 (Label Change Metrics)
+
+在记录 `label_change` 时，我们重点关注以下两类异常行为：
+
+1. Different 组: 原先攻击成功（导致模型预测错误），在环境改变后依旧攻击成功，但预测的错误标签发生了变化。
+
+2. Same 组: 原先攻击失败（模型预测正确），在环境改变后依旧攻击失败，但预测的置信度或次优标签发生了非预期波动。
+   
+   
+
+**结果汇总：**
+
+* 中间结果: 存放在 `PyTorch/{Model_Name}/.../details` 中，文件名对应具体的环境配置。
+
+* 统计汇总: 查看各子目录下的 `model_robustness_stats.csv` 和 `label_change_stats.csv`。
+
+* 针对当前框架下各个模型的统计总结果在“summary.xlsx”中。
