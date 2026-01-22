@@ -1,432 +1,389 @@
-import random
-import shutil
-import time
-import hashlib
-import pickle
+import argparse
+import csv
 import glob
+import hashlib
+import logging
+import os
+import pickle
+import random
+import sys
+import time
+from pathlib import Path
+from typing import List, Dict, Any
 
-import troubleshooter as ts
-from typing import List, Dict, Set, Tuple, Any
 import numpy as np
+import pandas as pd
 import torch
-# import mindspore as ms
-# from mindspore import context
 
-from Compare.Compare import InferAndCompare, InferAndCompareSingleModel, InferAndCompareSingleModel1
-from Compare.Count import CountInSeq
+# 添加当前目录到环境变量，确保能引用到项目模块
+current_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(current_dir))
+
+from config import model_map, NUM_CLASSES, group_0, group_1
+from data.getdata import generate_random_data
 from models import convert_weights
 from attacks import generate_adversarial_samples, create_pytorch_classifier
-from data.getdata import generate_random_data
-import pandas as pd
-import argparse
+from Compare.Compare import InferAndCompareSingleModel, InferAndCompareSingleModel1
+from Compare.Count import CountInSeq
 
-import os
-import csv
-import sys
+# --- 全局配置 ---
+BATCH_SIZE = 30
+EXECUTION_ROUNDS = 100
+ATTACK_TECHNIQUES = ['FGM', 'PGD', 'CW', 'DeepFool', 'Universal']
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
-from config import model_map, NUM_CLASSES, group_0, group_1
+# 配置日志输出
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
-# 辅助函数：生成numpy数组的哈希值
-def numpy_to_hash(arr):
-    """将numpy数组转换为哈希字符串"""
-    return hashlib.md5(arr.tobytes()).hexdigest()
-
-# 辅助函数：从已有攻击数据文件夹加载所有攻击样本
-def load_existing_attack_samples(model_path):
-    """从已有攻击数据文件夹加载所有攻击样本"""
-    attack_samples = []
-    sample_paths = []
-    
-    # 搜索所有攻击数据文件
-    attack_pattern = os.path.join(model_path, "adversarial_samples", "round_*_attack_*.npy")
-    attack_files = glob.glob(attack_pattern)
-    
-    for file_path in attack_files:
-        try:
-            sample = np.load(file_path)
-            attack_samples.append(sample)
-            sample_paths.append(file_path)
-        except Exception as e:
-            print(f"加载攻击样本文件失败 {file_path}: {e}")
-    
-    return attack_samples, sample_paths
-
-def load_initial_seed_data(model_path):
-    """加载初始种子数据"""
-    initial_seed_path = os.path.join(model_path, "adversarial_samples", "seed_data", "initial_seed_data.npy")
-    if os.path.exists(initial_seed_path):
-        return np.load(initial_seed_path), initial_seed_path
-    return None, None
-
-parser = argparse.ArgumentParser(description='运行模型组')
-parser.add_argument('--group', type=int, required=True, choices=[0, 1], help='要运行的组号 (0, 1)')
-parser.add_argument('--gpu', type=int, required=True, help='指定使用的GPU卡号')
-args = parser.parse_args()
-
-if args.group == 0:
-    models_to_run = group_0
-elif args.group == 1:
-    models_to_run = group_1
-
-#context.set_context(mode=context.PYNATIVE_MODE, device_target="GPU")
-device = torch.device(f'cuda:{args.gpu}')
-print(f"使用GPU设备: cuda:{args.gpu}")
-
-batch_size = 30
-
-for Torch_model, input_shape in models_to_run:
-    print("-----------------------------------------------------------------------------\n")
-    print(f"{input_shape}模型运行中....")
-    print("-----------------------------------------------------------------------------\n")
-
-    model_path = f'PyTorch/{Torch_model}'
-
-    os.makedirs(model_path, exist_ok=True)
-    os.makedirs(f'{model_path}/adversarial_samples', exist_ok=True)
-    os.makedirs(f'{model_path}/adversarial_samples/seed_data', exist_ok=True)
-    os.makedirs(f'{model_path}/Different', exist_ok=True)
-    os.makedirs(f'{model_path}/Different/first_attack', exist_ok=True)
-    os.makedirs(f'{model_path}/Different/re_attack', exist_ok=True)
-    os.makedirs(f'{model_path}/Same', exist_ok=True)
-    os.makedirs(f'{model_path}/Same/first_attack', exist_ok=True)
-    os.makedirs(f'{model_path}/Same/re_attack', exist_ok=True)
-
-
-    # 准备
-    attack_techniques = ['FGM', 'PGD', 'CW', 'DeepFool', 'Universal']  # 'HopSkipJump'] #HopSkipJump时间太长了（需要1.5-3小时）
-    
-    # 加载已有的攻击数据和初始种子
-    existing_attack_samples, existing_sample_paths = load_existing_attack_samples(model_path)
-    initial_seed_data, initial_seed_path = load_initial_seed_data(model_path)
-    
-    # 如果没有初始种子数据，生成新的
-    if initial_seed_data is None:
-        test_data = generate_random_data(model_map[input_shape], batch_size)
-        initial_seed_path = os.path.join(model_path, "adversarial_samples", "seed_data", "initial_seed_data.npy")
-        np.save(initial_seed_path, test_data)
-        initial_seed_data = test_data
-    else:
-        test_data = initial_seed_data
-    
-    torch_model = model_map[Torch_model](num_classes=NUM_CLASSES)
-    torch_model.to(device)
-    model_save_path = os.path.join(model_path, f"{Torch_model}.pth")
-    torch.save(torch_model.state_dict(), model_save_path)
-    execution_rounds = 100
-    Robustness = []  # 鲁棒性bug列表
-
-    # 初始化统计字典
-    T = {a: 0 for a in attack_techniques}  # 不一致计数
-    H = {a: 0 for a in attack_techniques}  # 历史不一致计数
-    S = []  # 攻击序列
-    D_diff = []  # 差异数据集
-    
-    # 构建种子数据池（包含初始种子和所有已有攻击数据）
-    all_seed_data = [initial_seed_data]  # 保存初始种子
-    all_seed_paths = [initial_seed_path]  # 所有种子数据池
-
-    if existing_attack_samples:
-        all_seed_data.extend(existing_attack_samples)
-        all_seed_paths.extend(existing_sample_paths)
-    
-    # 将列表转换为numpy数组以便后续处理
-    if len(all_seed_data) > 1:
-        all_seed_data = [arr if arr.ndim == 4 else np.expand_dims(arr, axis=0) for arr in all_seed_data]
-        all_seed_data = np.concatenate(all_seed_data)
-    else:
-        all_seed_data = all_seed_data[0]
-    
-    # 创建路径映射字典 - 修复索引错误
-    numpy_to_path = {}
-    for i, sample in enumerate(all_seed_data):
-        sample_hash = numpy_to_hash(sample)
+class RobustnessTester:
+    def __init__(self, model_name: str, input_shape: str, gpu_id: int):
+        self.model_name = model_name
+        self.input_shape = input_shape
+        self.device = torch.device(f'cuda:{gpu_id}')
+        self.gpu_id = gpu_id
         
-        # 对于初始种子数据，所有样本都映射到同一个路径
-        if i < len(initial_seed_data):
-            numpy_to_path[sample_hash] = initial_seed_path
+        # 路径配置 (使用pathlib管理)
+        self.base_path = Path(f'PyTorch/{self.model_name}')
+        self.adv_path = self.base_path / 'adversarial_samples'
+        self.seed_path = self.adv_path / 'seed_data'
+        
+        # 初始化目录结构
+        self._init_directories()
+        
+        # 加载并保存模型初始状态
+        self.model = self._load_and_save_model()
+
+    def _init_directories(self):
+        """初始化所有必要的文件夹"""
+        dirs = [
+            self.seed_path,
+            self.base_path / 'Different/first_attack',
+            self.base_path / 'Different/re_attack',
+            self.base_path / 'Same/first_attack',
+            self.base_path / 'Same/re_attack'
+        ]
+        for d in dirs:
+            d.mkdir(parents=True, exist_ok=True)
+
+    def _load_and_save_model(self):
+        """加载模型权重并保存一份副本"""
+        model = model_map[self.model_name](num_classes=NUM_CLASSES)
+        model.to(self.device)
+        torch.save(model.state_dict(), self.base_path / f"{self.model_name}.pth")
+        return model
+
+    @staticmethod
+    def numpy_to_hash(arr: np.ndarray) -> str:
+        """生成数组的MD5哈希，用于去重和映射"""
+        return hashlib.md5(arr.tobytes()).hexdigest()
+
+    def _load_data_pool(self):
+        """加载初始种子和历史攻击样本，构建数据池"""
+        # 1. 加载或生成初始种子
+        seed_file = self.seed_path / "initial_seed_data.npy"
+        if seed_file.exists():
+            initial_seed = np.load(seed_file)
         else:
-            # 对于攻击数据，计算正确的索引
-            attack_index = i - len(initial_seed_data)
-            if attack_index < len(existing_sample_paths):
-                numpy_to_path[sample_hash] = existing_sample_paths[attack_index]
-            else:
-                # 如果索引超出范围，使用最后一个路径
-                numpy_to_path[sample_hash] = existing_sample_paths[-1] if existing_sample_paths else initial_seed_path
-
-    print("进行初始化...")
-    for attack in attack_techniques:
-        print(f"现在攻击的是{attack}....")
-
-        start = time.perf_counter()
-        classifier = create_pytorch_classifier(torch_model, model_map[input_shape], NUM_CLASSES)
-        attack_data = generate_adversarial_samples(attack, classifier, test_data)
-        end = time.perf_counter()
-        print(f"运行时间: {end - start:.6f} 秒")
-
-        cnt1, diff_indices, cnt2, same_indices, new_numpy_to_path = InferAndCompareSingleModel(
-            torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", 0, attack, numpy_to_path,
-            model_path)
+            logger.info("生成初始随机种子数据...")
+            initial_seed = generate_random_data(model_map[self.input_shape], BATCH_SIZE)
+            np.save(seed_file, initial_seed)
         
-        # 更新numpy_to_path字典
-        numpy_to_path.update(new_numpy_to_path)
+        # 2. 加载历史攻击样本
+        attack_samples = []
+        sample_paths = []
+        # 使用glob匹配所有round的攻击数据
+        for f in glob.glob(str(self.adv_path / "round_*_attack_*.npy")):
+            try:
+                attack_samples.append(np.load(f))
+                sample_paths.append(f)
+            except Exception as e:
+                logger.error(f"文件加载失败 {f}: {e}")
+
+        # 3. 合并数据
+        all_data_list = [initial_seed] + attack_samples
+        # 确保维度一致 (处理可能的维度差异)
+        processed_list = [arr if arr.ndim == 4 else np.expand_dims(arr, 0) for arr in all_data_list]
+        combined_data = np.concatenate(processed_list)
+
+        # 4. 重建 Hash -> Path 映射
+        path_map = {}
+        # 映射初始种子
+        for i in range(len(initial_seed)):
+            h = self.numpy_to_hash(combined_data[i])
+            path_map[h] = str(seed_file)
         
-        D_new = attack_data[diff_indices]
+        # 映射攻击样本
+        curr_idx = len(initial_seed)
+        for batch_idx, batch_data in enumerate(attack_samples):
+            # 防止索引越界，虽然理论上不会
+            path = sample_paths[batch_idx] if batch_idx < len(sample_paths) else str(seed_file)
+            for j in range(len(batch_data)):
+                if curr_idx + j < len(combined_data):
+                    h = self.numpy_to_hash(combined_data[curr_idx + j])
+                    path_map[h] = path
+            curr_idx += len(batch_data)
 
-        T[attack] = cnt1
-        H[attack] = 0
+        return combined_data, path_map
+
+    def _log_stats(self, category: str, round_idx: int, count: int, total: int):
+        """写入统计CSV"""
+        csv_path = self.base_path / category / 'first_attack' / 'model_robustness_stats.csv'
+        is_new = not csv_path.exists()
         
-        # 将新生成的攻击数据添加到种子池中
-        if len(D_new) > 0:
-            # 如果种子池为空，则直接赋值；否则拼接
-            if len(all_seed_data) == 0:
-                all_seed_data = D_new
-            else:
-                all_seed_data = np.concatenate([all_seed_data, D_new])
-
-    print("初始化结束...")
-
-    # 初始化文件
-    with open(f"{model_path}/Different/first_attack/model_robustness_stats.csv", 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Round", "Cnt", "All", "Prob"])
-    with open(f"{model_path}/Same/first_attack/model_robustness_stats.csv", 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Round", "Cnt", "All", "Prob"])
-
-    for execution_round in range(execution_rounds):
-        if len(all_seed_data) <= batch_size:
-            test_data = all_seed_data
-            selected_indices = list(range(len(all_seed_data)))
-        else:
-            selected_indices = np.random.choice(len(all_seed_data), batch_size, replace=False)
-            test_data = all_seed_data[selected_indices]
-        
-        gen = execution_round + 1
-        
-        print(f"这是第{gen}轮推理...")
-        G = [0 for attack in attack_techniques]
-        for j in range(len(attack_techniques)):
-            G[j] = T[attack_techniques[j]] - H[attack_techniques[j]]
-        G_max = max(G)
-        C = []
-        for i, g in enumerate(G):
-            if g == G_max:
-                C.append(i)
-
-        F_min, c = CountInSeq(S, C, attack_techniques)
-        i = random.choice(c)
-        attack = attack_techniques[i]
-        print(f"要进行的是{attack}攻击...")
-        S.append(attack)
-
-        classifier = create_pytorch_classifier(torch_model, model_map[input_shape], NUM_CLASSES)
-        attack_data = generate_adversarial_samples(attack, classifier, test_data)
-
-        cnt1, diff_indices, cnt2, same_indices, new_numpy_to_path = InferAndCompareSingleModel(
-            torch_model, test_data, attack_data, device, f"{model_path}/adversarial_samples", gen, attack, numpy_to_path,
-            model_path)
-        
-        # 更新numpy_to_path字典
-        numpy_to_path.update(new_numpy_to_path)
-        
-        D_new = attack_data[diff_indices]
-        all = len(attack_data)  # 所有攻击数据个数
-
-        H[attack] = T[attack]
-        T[attack] = cnt1
-        
-        # 将新生成的攻击数据添加到种子池中
-        if len(D_new) > 0:
-            # 如果种子池为空，则直接赋值；否则拼接
-            if len(all_seed_data) == 0:
-                all_seed_data = D_new
-            else:
-                all_seed_data = np.concatenate([all_seed_data, D_new])
-        
-        D_diff.extend(D_new)
-
-        # 写入统计信息
-        with open(f"{model_path}/Different/first_attack/model_robustness_stats.csv", 'a', newline='', encoding='utf-8') as f:
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow([f"{gen}", cnt1, all, 1.0 * cnt1 / all])
-        with open(f"{model_path}/Same/first_attack/model_robustness_stats.csv", 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([f"{gen}", cnt2, all, 1.0 * cnt2 / all])
+            if is_new:
+                writer.writerow(["Round", "Cnt", "All", "Prob"])
+            prob = count / total if total > 0 else 0
+            writer.writerow([f"{round_idx}", count, total, prob])
 
-    # 保存最终的numpy到路径映射
-    mapping_path = os.path.join(f"{model_path}/adversarial_samples", "numpy_to_path_mapping.pkl")
-    with open(mapping_path, 'wb') as f:
-        pickle.dump(numpy_to_path, f)
+    def run_initial_fuzzing(self):
+        """第一阶段：初始模糊测试 (原代码的主循环逻辑)"""
+        logger.info(f"=== 开始 {self.model_name} 的初始模糊测试 ===")
+        
+        data_pool, path_map = self._load_data_pool()
+        
+        # 状态追踪
+        stats = {
+            'T': {a: 0 for a in ATTACK_TECHNIQUES}, # 总次数
+            'H': {a: 0 for a in ATTACK_TECHNIQUES}, # 历史次数
+            'Seq': [] # 攻击序列
+        }
 
-    print("推理轮次结束...")
-
-# 定义扰动参数
-# ('fp32','fp32'),('cuda:0','cuda:0'),('0000','0000') 
-
-def run2(op):
-    if op==0:
-        sss='Different'
-        ssss='Same'
-    else: 
-        sss='Same'
-        ssss='Different'
-    
-    for Torch_model, input_shape in models_to_run:
-        print("-----------------------------------------------------------------------------")
-        print(f"对{input_shape}模型进行二次扰动攻击(统计{sss})....")
-        print("-----------------------------------------------------------------------------")
-
-        model_path = f'PyTorch/{Torch_model}'
-        file_path = os.path.join(model_path, f'{sss}/first_attack/adversarial_log.csv')
-
-        os.makedirs(f'PyTorch/{Torch_model}/{sss}/re_attack',exist_ok=True)
-        dir_path = f'PyTorch/{Torch_model}/{sss}/re_attack'
-
-        dir_path1=os.path.join(dir_path,'Compile')
-        dir_path2=os.path.join(dir_path,'Precision')
-        dir_path3=os.path.join(dir_path,'Device')
-
-        os.makedirs(dir_path1)
-        os.makedirs(dir_path2)
-        os.makedirs(dir_path3)
-
-        os.makedirs(os.path.join(dir_path1,'details'))
-        os.makedirs(os.path.join(dir_path2,'details'))
-        os.makedirs(os.path.join(dir_path3,'details'))
-
-        os.makedirs(os.path.join(dir_path1,'label_change'))
-        os.makedirs(os.path.join(dir_path2,'label_change'))
-        os.makedirs(os.path.join(dir_path3,'label_change'))
-
-        f1_path=os.path.join(dir_path,'Compile/re_attack_stats.csv')
-        f2_path=os.path.join(dir_path,'Device/re_attack_stats.csv')
-        f3_path=os.path.join(dir_path,'Precision/re_attack_stats.csv')
-
-        ff1_path=os.path.join(dir_path,'Compile/label_change_stats.csv')
-        ff2_path=os.path.join(dir_path,'Device/label_change_stats.csv')
-        ff3_path=os.path.join(dir_path,'Precision/label_change_stats.csv')
-
-        with open(f1_path, 'w', newline='', encoding='utf-8') as f:
-            writer=csv.writer(f)
-            writer.writerow(['(Precision_Test, Precision_Attack)',
-                        '(Device_Test, Device_Attack)',
-                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
-                        'Total_cnt',f'{ssss}_cnt','Prob'])
-        with open(f2_path, 'w', newline='', encoding='utf-8') as f:
-            writer=csv.writer(f)
-            writer.writerow(['(Precision_Test, Precision_Attack)',
-                        '(Device_Test, Device_Attack)',
-                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
-                        'Total_cnt',f'{ssss}_cnt','Prob'])
-        with open(f3_path, 'w', newline='', encoding='utf-8') as f:
-            writer=csv.writer(f)
-            writer.writerow(['(Precision_Test, Precision_Attack)',
-                        '(Device_Test, Device_Attack)',
-                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
-                        'Total_cnt',f'{ssss}_cnt','Prob'])
+        # --- 初始化攻击阶段 ---
+        logger.info(">>> 初始化攻击阶段...")
+        for attack in ATTACK_TECHNIQUES:
+            logger.info(f"执行初始化攻击: {attack}")
+            t0 = time.perf_counter()
             
-        with open(ff1_path, 'w', newline='', encoding='utf-8') as f:
-            writer=csv.writer(f)
-            writer.writerow(['(Precision_Test, Precision_Attack)',
-                        '(Device_Test, Device_Attack)',
-                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
-                        'Still_cnt','label_change_cnt','Prob'])
-        with open(ff2_path, 'w', newline='', encoding='utf-8') as f:
-            writer=csv.writer(f)
-            writer.writerow(['(Precision_Test, Precision_Attack)',
-                        '(Device_Test, Device_Attack)',
-                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
-                        'Still_cnt','label_change_cnt','Prob'])
-        with open(ff3_path, 'w', newline='', encoding='utf-8') as f:
-            writer=csv.writer(f)
-            writer.writerow(['(Precision_Test, Precision_Attack)',
-                        '(Device_Test, Device_Attack)',
-                        '(Compile_Test(fallback_random, epilogue_fusion, shape_padding, dynamic), Compile_Attack(fallback_random, epilogue_fusion, shape_padding, dynamic))',
-                        'Still_cnt','label_change_cnt','Prob'])
-        
-        df = pd.read_csv(file_path)
-        sample_paths = df['Sample_Path'].tolist()
-        seed_paths = df['Seed_Path'].tolist()
-        sample_labels=df['Sample_Label'].tolist()
-        seed_labels=df['Seed_Label'].tolist()
+            # 使用初始种子进行攻击
+            classifier = create_pytorch_classifier(self.model, model_map[self.input_shape], NUM_CLASSES)
+            # 确保只用前BATCH_SIZE个数据做初始化
+            init_batch = data_pool[:BATCH_SIZE] if len(data_pool) >= BATCH_SIZE else data_pool
+            
+            attack_data = generate_adversarial_samples(attack, classifier, init_batch)
+            logger.info(f"耗时: {time.perf_counter() - t0:.4f}s")
 
-        change=0
-        
-        # Compile
-        for i in ['fp32']:
-            for j in [f'cuda:{args.gpu}']:
-                for k in ['1000','0100','0010','0001']:
-                    total, same, change = InferAndCompareSingleModel1(
-                                model_map[Torch_model](num_classes=NUM_CLASSES), 
-                                seed_paths,
-                                sample_paths,
-                                seed_labels,
-                                sample_labels,
-                                i,i,j,j,k,k,
-                                dir_path1,
-                                op
-                            )
-                    
-                    if(total):
-                        with open(f1_path, 'a', newline='', encoding='utf-8') as f:
-                            writer=csv.writer(f)
-                            writer.writerow([i,i,j,j,k,k,total,same,same*1.0/total])
-                        
-                    if(total-same):
-                        with open(ff1_path, 'a', newline='', encoding='utf-8') as f:
-                            writer=csv.writer(f)
-                            writer.writerow([i,i,j,j,k,k,total-same,change,change*1.0/(total-same)])
-        
-        # Device
-        for i in ['fp32']:
-            for j in ['cpu']:
-                for k in ['0000']:
-                    total, same, change = InferAndCompareSingleModel1(
-                                model_map[Torch_model](num_classes=NUM_CLASSES), 
-                                seed_paths,
-                                sample_paths,
-                                seed_labels,
-                                sample_labels,
-                                i,i,j,j,k,k,
-                                dir_path2,
-                                op
-                            )
-                    
-                    if(total):
-                        with open(f2_path, 'a', newline='', encoding='utf-8') as f:
-                            writer=csv.writer(f)
-                            writer.writerow([i,i,j,j,k,k,total,same,same*1.0/total])
-                        
-                    if(total-same):
-                        with open(ff2_path, 'a', newline='', encoding='utf-8') as f:
-                            writer=csv.writer(f)
-                            writer.writerow([i,i,j,j,k,k,total-same,change,change*1.0/(total-same)])
+            # 比较推理结果
+            cnt1, diff_idx, cnt2, _, new_map = InferAndCompareSingleModel(
+                self.model, init_batch, attack_data, self.device, 
+                str(self.adv_path), 0, attack, path_map, str(self.base_path)
+            )
+            
+            # 更新状态
+            path_map.update(new_map)
+            stats['T'][attack] = cnt1
+            
+            # 将新生成的有效样本加入池中
+            if len(diff_idx) > 0:
+                data_pool = np.concatenate([data_pool, attack_data[diff_idx]])
 
-        # Precision
-        for i in ['fp16']:
-            for j in [f'cuda:{args.gpu}']:
-                for k in ['0000']:
-                    total, same, change = InferAndCompareSingleModel1(
-                                model_map[Torch_model](num_classes=NUM_CLASSES), 
-                                seed_paths,
-                                sample_paths,
-                                seed_labels,
-                                sample_labels,
-                                i,i,j,j,k,k,
-                                dir_path3,
-                                op
-                            )
-                    
-                    if(total):
-                        with open(f3_path, 'a', newline='', encoding='utf-8') as f:
-                            writer=csv.writer(f)
-                            writer.writerow([i,i,j,j,k,k,total,same,same*1.0/total])
-                        
-                    if(total-same):
-                        with open(ff3_path, 'a', newline='', encoding='utf-8') as f:
-                            writer=csv.writer(f)
-                            writer.writerow([i,i,j,j,k,k,total-same,change,change*1.0/(total-same)])
-run2(0)
-run2(1)
+        # --- Fuzzing 循环阶段 ---
+        logger.info(f">>> 进入 Fuzzing 循环 ({EXECUTION_ROUNDS} 轮)...")
+        for r in range(EXECUTION_ROUNDS):
+            round_num = r + 1
+            logger.info(f"--- Round {round_num} ---")
+            
+            # 1. 随机采样
+            if len(data_pool) <= BATCH_SIZE:
+                current_batch = data_pool
+            else:
+                indices = np.random.choice(len(data_pool), BATCH_SIZE, replace=False)
+                current_batch = data_pool[indices]
+
+            # 2. 策略选择 (基于增益 G = T - H)
+            gains = [stats['T'][a] - stats['H'][a] for a in ATTACK_TECHNIQUES]
+            max_gain = max(gains)
+            candidates = [i for i, g in enumerate(gains) if g == max_gain]
+            
+            # 调用 CountInSeq 选择算法
+            _, chosen_indices = CountInSeq(stats['Seq'], candidates, ATTACK_TECHNIQUES)
+            attack_name = ATTACK_TECHNIQUES[random.choice(chosen_indices)]
+            stats['Seq'].append(attack_name)
+            
+            logger.info(f"选择策略: {attack_name}")
+
+            # 3. 生成对抗样本
+            classifier = create_pytorch_classifier(self.model, model_map[self.input_shape], NUM_CLASSES)
+            attack_data = generate_adversarial_samples(attack_name, classifier, current_batch)
+
+            # 4. 推理比较
+            cnt1, diff_idx, cnt2, _, new_map = InferAndCompareSingleModel(
+                self.model, current_batch, attack_data, self.device, 
+                str(self.adv_path), round_num, attack_name, path_map, str(self.base_path)
+            )
+
+            # 5. 更新数据与统计
+            path_map.update(new_map)
+            stats['H'][attack_name] = stats['T'][attack_name]
+            stats['T'][attack_name] = cnt1
+            
+            if len(diff_idx) > 0:
+                data_pool = np.concatenate([data_pool, attack_data[diff_idx]])
+
+            total_gen = len(attack_data)
+            self._log_stats('Different', round_num, cnt1, total_gen)
+            self._log_stats('Same', round_num, cnt2, total_gen)
+
+        # 保存最终映射关系
+        with open(self.adv_path / "numpy_to_path_mapping.pkl", 'wb') as f:
+            pickle.dump(path_map, f)
+        
+        logger.info("初始 Fuzzing 完成。")
+
+    def run_stability_test(self, op_mode: int):
+        """
+        第二阶段：二次攻击/稳定性测试 (原 run2 函数)
+        op_mode: 0 (Target=Different, Counter=Same), 1 (Target=Same, Counter=Different)
+        """
+        target_dir = 'Different' if op_mode == 0 else 'Same'
+        counter_dir = 'Same' if op_mode == 0 else 'Different'
+        
+        log_file = self.base_path / target_dir / 'first_attack' / 'adversarial_log.csv'
+        if not log_file.exists():
+            logger.warning(f"日志文件不存在，跳过稳定性测试: {log_file}")
+            return
+
+        logger.info(f"=== 开始稳定性测试 (Target: {target_dir}) ===")
+        
+        # 准备输出目录
+        re_attack_base = self.base_path / target_dir / 're_attack'
+        sub_categories = ['Compile', 'Precision', 'Device']
+        
+        for sub in sub_categories:
+            (re_attack_base / sub / 'details').mkdir(parents=True, exist_ok=True)
+            (re_attack_base / sub / 'label_change').mkdir(parents=True, exist_ok=True)
+            # 初始化CSV头
+            self._init_stability_csv(re_attack_base / sub / 're_attack_stats.csv', counter_dir)
+            self._init_label_change_csv(re_attack_base / sub / 'label_change_stats.csv')
+
+        # 加载待测试数据
+        df = pd.read_csv(log_file)
+        # 转换为列表，方便传入 InferAndCompareSingleModel1
+        data_args = {
+            'seed_paths': df['Seed_Path'].tolist(),
+            'sample_paths': df['Sample_Path'].tolist(),
+            'seed_labels': df['Seed_Label'].tolist(),
+            'sample_labels': df['Sample_Label'].tolist()
+        }
+
+        # --- 定义测试配置 (消除了原代码中的重复循环) ---
+        # 格式: (类别, 精度测试, 精度攻击, 设备测试, 设备攻击, 编译测试, 编译攻击)
+        gpu_str = f'cuda:{self.gpu_id}'
+        configs = []
+        
+        # 1. Compile 组 (fp32, gpu, 不同的编译选项)
+        for code in ['1000', '0100', '0010', '0001']:
+            configs.append(('Compile', 'fp32', 'fp32', gpu_str, gpu_str, code, code))
+            
+        # 2. Device 组 (fp32, cpu, 默认编译)
+        configs.append(('Device', 'fp32', 'fp32', 'cpu', 'cpu', '0000', '0000'))
+        
+        # 3. Precision 组 (fp16, gpu, 默认编译)
+        configs.append(('Precision', 'fp16', 'fp16', gpu_str, gpu_str, '0000', '0000'))
+
+        # 执行所有配置
+        for category, pt, pa, dt, da, ct, ca in configs:
+            self._run_single_stability_batch(
+                category, 
+                (pt, pa, dt, da, ct, ca), 
+                data_args, 
+                re_attack_base, 
+                op_mode
+            )
+
+    def _run_single_stability_batch(self, category, params, data, base_path, op_mode):
+        """执行单次稳定性对比测试并记录结果"""
+        pt, pa, dt, da, ct, ca = params
+        
+        # 调用核心对比函数
+        total, same, change = InferAndCompareSingleModel1(
+            self.model,
+            data['seed_paths'],
+            data['sample_paths'],
+            data['seed_labels'],
+            data['sample_labels'],
+            pt, pa, dt, da, ct, ca,
+            str(base_path / category),
+            op_mode
+        )
+
+        # 记录统计信息
+        if total > 0:
+            csv_path = base_path / category / 're_attack_stats.csv'
+            with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([pt, dt, ct, total, same, same / total])
+
+        # 记录标签变化
+        diff = total - same
+        if diff > 0:
+            csv_path = base_path / category / 'label_change_stats.csv'
+            with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([pt, dt, ct, diff, change, change / diff])
+
+    @staticmethod
+    def _init_stability_csv(path, counter_col):
+        """初始化稳定性测试结果CSV头"""
+        with open(path, 'w', newline='', encoding='utf-8') as f:
+            csv.writer(f).writerow([
+                '(Precision)', '(Device)', '(Compile)', 
+                'Total_cnt', f'{counter_col}_cnt', 'Prob'
+            ])
+
+    @staticmethod
+    def _init_label_change_csv(path):
+        """初始化标签变化统计CSV头"""
+        with open(path, 'w', newline='', encoding='utf-8') as f:
+            csv.writer(f).writerow([
+                '(Precision)', '(Device)', '(Compile)', 
+                'Still_cnt', 'label_change_cnt', 'Prob'
+            ])
+
+
+def main():
+    # --- 固定随机种子 (复现性) ---
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+    # --- 命令行参数 ---
+    parser = argparse.ArgumentParser(description='模型鲁棒性测试框架')
+    parser.add_argument('--group', type=int, required=True, choices=[0, 1], help='模型组 (0 或 1)')
+    parser.add_argument('--gpu', type=int, required=True, help='GPU ID')
+    # 增加 mode 参数以便单独运行某个阶段
+    parser.add_argument('--mode', type=str, choices=['fuzz', 'stability', 'all'], default='all', 
+                        help='运行模式: fuzz (仅第一阶段), stability (仅第二阶段), all (全部)')
+    args = parser.parse_args()
+
+    # 选择模型组
+    models = group_0 if args.group == 0 else group_1
+    
+    logger.info(f"任务启动: GPU={args.gpu}, Mode={args.mode}")
+
+    for model_name, input_shape in models:
+        logger.info("=" * 60)
+        logger.info(f"处理模型: {model_name} (输入尺寸: {input_shape})")
+        logger.info("=" * 60)
+
+        tester = RobustnessTester(model_name, input_shape, args.gpu)
+
+        # 阶段一: 初始 Fuzzing
+        if args.mode in ['fuzz', 'all']:
+            tester.run_initial_fuzzing()
+        
+        # 阶段二: 稳定性/二次攻击测试
+        if args.mode in ['stability', 'all']:
+            tester.run_stability_test(op_mode=0)
+            tester.run_stability_test(op_mode=1)
+
+if __name__ == "__main__":
+    main()
