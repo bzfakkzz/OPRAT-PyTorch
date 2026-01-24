@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-# PyTorch AlexNet-CIFAR10模型
+# PyTorch AlexNet-CIFAR10
 class TorchAlexNetCIFAR10(nn.Module):
     def __init__(self, num_classes=10):
         super(TorchAlexNetCIFAR10, self).__init__()
@@ -50,3 +50,4 @@ class TorchAlexNetCIFAR10(nn.Module):
         x = self.dropout2(x)
         x = self.fc3(x)
         return x
+
