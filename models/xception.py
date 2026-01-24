@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -145,3 +144,4 @@ class TorchXception(nn.Module):
         nn.init.normal_(self.fc.weight, 0, 0.01)
         if self.fc.bias is not None:
             nn.init.constant_(self.fc.bias, 0)
+
