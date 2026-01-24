@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import troubleshooter as ts
 
 # ---------------------------- PyTorch LeNet5 ----------------------------
 class TorchLeNet5(nn.Module):
@@ -44,3 +42,4 @@ class TorchLeNet5(nn.Module):
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
+
