@@ -5,7 +5,7 @@ import torch.nn as nn
 class TorchInceptionBlock(nn.Module):
     def __init__(self, in_channels, c1=16, c2=(32,64), c3=(16,32), c4=16):
         super(TorchInceptionBlock, self).__init__()
-        # Path del
+        # Path 1
         self.p1_1 = nn.Conv2d(in_channels, c1, kernel_size=1, bias=True)
 
         # Path 2
@@ -32,5 +32,6 @@ class TorchInceptionBlock(nn.Module):
         concatenated = torch.cat([p1, p2, p3, p4], dim=1)
         normalized = self.batch_norm(concatenated)
         return self.relu(normalized)
+
 
 
