@@ -1,4 +1,4 @@
-from models.vgg16 import TorchVGG16,
+from models.vgg16 import TorchVGG16
 from models.vgg16 import TorchVGG16
 from models.lstm0 import TorchLSTMModel0
 from models.alexnet import TorchAlexNetCIFAR10
@@ -65,4 +65,5 @@ group_1 = [
 # TorchLSTMModel0 (LSTMModel2在ART中会自动改成4维，未解决)
 # TorchMobileNet (DeepFool不收敛)
 # TorchVGG19 (DeepFool超时)
+
 
