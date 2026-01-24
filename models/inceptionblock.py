@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import troubleshooter as ts
 
 # ---------------------------- PyTorch InceptionBlock ----------------------------
 class TorchInceptionBlock(nn.Module):
@@ -34,4 +32,5 @@ class TorchInceptionBlock(nn.Module):
         concatenated = torch.cat([p1, p2, p3, p4], dim=1)
         normalized = self.batch_norm(concatenated)
         return self.relu(normalized)
+
 
