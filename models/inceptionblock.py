@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import troubleshooter as ts
 
-# ---------------------------- del. PyTorch InceptionBlock ----------------------------
+# ---------------------------- PyTorch InceptionBlock ----------------------------
 class TorchInceptionBlock(nn.Module):
     def __init__(self, in_channels, c1=16, c2=(32,64), c3=(16,32), c4=16):
         super(TorchInceptionBlock, self).__init__()
@@ -34,3 +34,4 @@ class TorchInceptionBlock(nn.Module):
         concatenated = torch.cat([p1, p2, p3, p4], dim=1)
         normalized = self.batch_norm(concatenated)
         return self.relu(normalized)
+
