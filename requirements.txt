@@ -1,0 +1,10 @@
+numpy
+pandas
+openpyxl
+torch>=1.10.0
+torchvision>=0.11.0
+matplotlib
+tqdm
+scipy
+pillow
+adversarial-robustness-toolbox
