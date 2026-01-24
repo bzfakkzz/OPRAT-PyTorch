@@ -1,7 +1,5 @@
-import numpy as np
 import torch
-import torch.nn as nn、
-import troubleshooter as ts、
+import torch.nn as nn
 
 
 # PyTorch AlexNet-CIFAR10模型
