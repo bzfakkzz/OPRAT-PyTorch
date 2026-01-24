@@ -1,9 +1,5 @@
 import torch
 import torch.nn as nn
-import mindspore as ms
-import mindspore.nn as nn_ms
-import troubleshooter as ts
-import os
 
 class TorchVGG16(nn.Module):
     def __init__(self, num_classes=100):
