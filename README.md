@@ -95,7 +95,18 @@
 
 * 统计汇总: 查看各子目录下的 `model_robustness_stats.csv` 和 `label_change_stats.csv`。
 
-* 针对当前框架下各个模型的统计总结果在“summary.xlsx”中。
+* 针对当前框架下各个模型的统计总结果在“summary.xlsx”中。所有实验均完整记录了 prob（置信度漂移）、Label_change（标签翻转频率）及 Stats_change 等核心指标，累计测试用例达数千组。
+
+
+**实验结果分析：**
+
+* 实验覆盖了 ResNet50、VGG16、DenseNet、Xception 等 7 种主流架构。观测表明，不同拓扑结构对底层算子优化的敏感度存在显著差异。
+
+* 在 TorchVGG16 的测试中，仅开启或关闭 epilogue_fusion 等编译优化标志位，就观测到在相同对抗输入下出现了 1,290 次标签翻转（Label Change）。这验证了后端编译器优化（如 TorchDynamo）可能引入非预期的推理不一致性。
+
+* 通过对比 FP32/AMP 精度 以及 CPU/CUDA 设备 的输出，数据表明 ResNet50 在不同环境下的预测一致性（Consistency Rate）相对较高，而 VGG 类模型受浮点累加顺序及硬件架构差异的影响更为明显。
+
+
 
 **已知问题:**
 
