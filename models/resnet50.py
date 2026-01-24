@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import troubleshooter as ts
 
 # ---------------------------- PyTorch ResNet-50 ----------------------------
 class TorchBottleneck(nn.Module):
