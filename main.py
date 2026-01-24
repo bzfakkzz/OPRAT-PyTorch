@@ -66,11 +66,20 @@ class RobustnessTester:
             d.mkdir(parents=True, exist_ok=True)
 
     def _load_and_save_model(self):
-        """加载模型并保存初始权重"""
+        """加载已有的权重，或初始化并保存新权重"""
         model = model_map[self.model_name](num_classes=NUM_CLASSES)
+        weight_path = self.base_path / f"{self.model_name}.pth"
+        
+        # 1. 是否存在权重文件
+        if weight_path.exists():
+            logger.info(f"Loading existing weights from {weight_path}")
+            model.load_state_dict(torch.load(weight_path, map_location=self.device))
+        else:
+            logger.info(f"Initializing random weights and saving to {weight_path}")
+            # 2. 如果不存在，保存当前随机初始化的权重
+            torch.save(model.state_dict(), weight_path)
+            
         model.to(self.device)
-        # 保存 .pth 副本
-        torch.save(model.state_dict(), self.base_path / f"{self.model_name}.pth")
         return model
 
     @staticmethod
@@ -357,4 +366,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
