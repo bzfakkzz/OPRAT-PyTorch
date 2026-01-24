@@ -6,7 +6,9 @@
 
 
 
-**目录结构说明：**   <img title="" src="assets/Structure.png" alt="Structure.png" style="zoom:33%;" data-align="center">
+**目录结构说明：**   
+以TorchLeNet5为例：
+<img title="" src="assets/Structure.png" alt="Structure.png" style="zoom:33%;" data-align="center">
 
 **注意**：
 
