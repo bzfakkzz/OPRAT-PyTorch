@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import troubleshooter as ts
 
 
 # PyTorch DenseNet-121
@@ -65,4 +63,5 @@ class TorchDenseNet(nn.Module):
         x = self.features(x)
         x = torch.flatten(x, 1)
         return self.classifier(x)
+
 
