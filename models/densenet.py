@@ -4,7 +4,7 @@ import torch.nn as nn
 import troubleshooter as ts
 
 
-# del. PyTorch DenseNet-121
+# PyTorch DenseNet-121
 class TorchBottleneck(nn.Module):
     expansion = 4
     def __init__(self, in_channels, growth_rate):
@@ -65,3 +65,4 @@ class TorchDenseNet(nn.Module):
         x = self.features(x)
         x = torch.flatten(x, 1)
         return self.classifier(x)
+
