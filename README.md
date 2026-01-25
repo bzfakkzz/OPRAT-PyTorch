@@ -17,12 +17,14 @@
 2. 完整汇总结果请参考根目录下的 `触发框架鲁棒性问题汇总.xlsx`。
 
 3. 原始数据后续将托管于 Figshare。
+
+4. 在进行消融实验（Ablation Study）时，项目使用了 `torch.compile` 进行编译优化。由于其默认后端 `Inductor` 依赖于 OpenAI Triton 编译器，而 Triton 目前对 Linux 系统的支持最为完善，因此**本实验必须在 Linux 操作系统上进行**。
    
    
 
 **快速开始：**
 
-1. 环境准备：确保已安装 Python 3.8+ 及 PyTorch 环境，使用Linux操作系统。
+1. 环境准备：请确保使用 Linux 操作系统，并已安装 Python 3.8+ 及 PyTorch 环境。
    
    ```bash
    pip install -r requirements.txt
