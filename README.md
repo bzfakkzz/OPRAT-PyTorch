@@ -22,7 +22,7 @@
 
 **快速开始：**
 
-1. 环境准备：确保已安装 Python 3.8+ 及 PyTorch 环境。
+1. 环境准备：确保已安装 Python 3.8+ 及 PyTorch 环境，使用Linux操作系统。
    
    ```bash
    pip install -r requirements.txt
