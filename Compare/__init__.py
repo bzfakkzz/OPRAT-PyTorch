@@ -1,8 +1,7 @@
-from .Compare import InferAndCompare, InferAndCompareSingleModel
+from .Compare import infer_and_compare_single_model, infer_and_compare_stability
 from .Count import CountInSeq
 __all__ = [
-    'InferAndCompare',
-    'InferAndCompareSingleModel',
-    'InferAndCompareSingleModel1',
+    'infer_and_compare_single_model', 
+    'infer_and_compare_stability',
     'CountInSeq'
 ]
