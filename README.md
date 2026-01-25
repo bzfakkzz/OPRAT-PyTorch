@@ -34,7 +34,7 @@
    
    * `--group`: 模型组编号 (0 或 1，详见 `config.py`)
    
-   * `--gpu`: 指定使用的 GPU ID
+   * `--gpu`: 指定使用的 GPU ID (参数-1则使用CPU)
    
    * `--mode`: 运行模式
      
