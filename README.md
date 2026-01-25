@@ -1,28 +1,28 @@
 ### OPRAT-PyTorch: 深度学习模型鲁棒性评估与模糊测试框架
 
+![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
 本项目实现了一个针对 PyTorch 模型的自动化鲁棒性评估框架（OPRAT）。通过对抗攻击生成（Fuzzing）与环境消融实验（Stability Analysis），系统地评估模型在不同编译选项、精度和硬件设备下的行为一致性与鲁棒性。
 
 ![](assets/img.png)
 
 
 
-**目录结构说明：**   
+**📂 目录结构说明：**   
 以TorchLeNet5为例：
 <img title="" src="assets/Structure.png" alt="Structure.png" style="zoom:33%;" data-align="center">
 
-**注意**：
 
-1. 由于 `.pth` (模型权重) 和 `.npy` (攻击样本) 文件体积过大，默认不上传至 GitHub。
-
-2. 完整汇总结果请参考根目录下的 `触发框架鲁棒性问题汇总.xlsx`。
-
-3. 原始数据后续将托管于 Figshare。
-
-4. 在进行消融实验（Ablation Study）时，项目使用了 `torch.compile` 进行编译优化。由于其默认后端 `Inductor` 依赖于 OpenAI Triton 编译器，而 Triton 目前对 Linux 系统的支持最为完善，因此**本实验必须在 Linux 操作系统上进行**。
+> **⚠️ 注意事项**：
+> 1. **大文件说明**：由于 `.pth` (模型权重) 和 `.npy` (攻击样本) 文件体积过大，默认不上传至 GitHub。代码已内置**权重自适应加载机制**，如缺失权重将自动初始化随机模型进行 Demo 运行。
+> 2. **结果汇总**：完整实验数据统计请参考根目录下的 `summary.xlsx`。
+> 3. **系统要求**：消融实验使用了 `torch.compile` (Inductor 后端) 进行编译优化。由于底层依赖 OpenAI Triton 编译器，**本实验强烈建议在 Linux 操作系统上进行**以获得完整支持。
    
    
 
-**快速开始：**
+**🚀 快速开始：**
 
 1. 环境准备：请确保使用 Linux 操作系统，并已安装 Python 3.8+ 及 PyTorch 环境。
    
@@ -36,7 +36,7 @@
    
    * `--group`: 模型组编号 (0 或 1，详见 `config.py`)
    
-   * `--gpu`: 指定使用的 GPU ID (参数-1则使用CPU)
+   * `--gpu`: 指定使用的 GPU ID (如选择使用CPU，参数设置为-1)
    
    * `--mode`: 运行模式
      
@@ -51,11 +51,14 @@
    ```bash
    # 在 GPU 0 上运行第 0 组模型的所有测试阶段
    python main.py --group 0 --gpu 0 --mode all
+
+   # 在 CPU 模式下运行
+   python main.py --group 0 --gpu -1 --mode all
    ```
    
    
 
-**实验设置与逻辑：**
+**🛠️ 实验设置与逻辑：**
 
 1. 基本参数
 * Batch Size: 30
@@ -91,16 +94,16 @@
    
    
 
-**结果汇总：**
+**📁 结果汇总：**
 
 * 中间结果: 存放在 `PyTorch/{Model_Name}/.../details` 中，文件名对应具体的环境配置。
 
-* 统计汇总: 查看各子目录下的 `model_robustness_stats.csv` 和 `label_change_stats.csv`。
+* 分项统计: 查看各子目录下的 `model_robustness_stats.csv` 和 `label_change_stats.csv`。
 
-* 针对当前框架下各个模型的统计总结果在“summary.xlsx”中。所有实验均完整记录了 prob（置信度漂移）、Label_change（标签翻转频率）及 Stats_change 等核心指标，累计测试用例达数千组。
+* 全局汇总：针对当前框架下各个模型的统计总结果在“summary.xlsx”中。所有实验均完整记录了 prob（置信度漂移）、Label_change（标签翻转频率）及 Stats_change 等核心指标，累计测试用例达数千组。
 
 
-**实验结果分析：**
+**📊 实验结果分析：**
 
 * 实验覆盖了 ResNet50、VGG16、DenseNet、Xception 等 7 种主流架构。观测表明，不同拓扑结构对底层算子优化的敏感度存在显著差异。
 
@@ -109,7 +112,6 @@
 * 通过对比 FP32/AMP 精度 以及 CPU/CUDA 设备 的输出，数据表明 ResNet50 在不同环境下的预测一致性（Consistency Rate）相对较高，而 VGG 类模型受浮点累加顺序及硬件架构差异的影响更为明显。
 
 
+**📧 联系：**
 
-**已知问题:**
-
-* MindSpore 版本因服务器环境兼容性问题正在重构中
+如有任何问题、建议或想法交流，欢迎发送邮件至 **2212110418@stmail.ntu.edu.cn** 或提交 Issue。
