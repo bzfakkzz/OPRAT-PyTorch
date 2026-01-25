@@ -41,7 +41,7 @@ class RobustnessTester:
     def __init__(self, model_name: str, input_shape: str, gpu_id: int):
         self.model_name = model_name
         self.input_shape = input_shape
-        self.device = torch.device(f'cuda:{gpu_id}')
+        self.device = torch.device('cpu') if gpu_id == -1 else torch.device(f'cuda:{gpu_id}')
         self.gpu_id = gpu_id
         
         # 路径管理 (Pathlib)
@@ -265,7 +265,7 @@ class RobustnessTester:
         }
 
         # --- 定义测试配置 ---
-        gpu_str = f'cuda:{self.gpu_id}'
+        gpu_str = 'cpu' if self.gpu_id == -1 else f'cuda:{self.gpu_id}'
         configs = []
         
         # 1. Compile 组
@@ -366,5 +366,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
